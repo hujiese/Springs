@@ -2,6 +2,8 @@
 
 Spring可以使用XML配置的方法向IOC容器中注入bean，但是这种方法有些繁琐和不便，于是便有了使用注解驱动开发的方式，在Spring Boot和Spring Cloud中也是推荐使用注解开发。
 
+### 1、注解开发
+
 #### 首先看一个例子，这个例子使用传统的xml配置方式开发。
 
 首先创建一个Person类：
@@ -152,4 +154,185 @@ Spring可以使用XML配置的方法向IOC容器中注入bean，但是这种方�
 输出如下：
 
 	Person [name=lisi, age=20, nickName=null]
+	person
+
+### 2、@ComponentScan自动扫描组件
+
+在传统的xml配置方法中，如果要扫描一个包下面的所有Bean，需要做如下配置：
+
+	<!-- 包扫描、只要标注了@Controller、@Service、@Repository，@Component -->
+	<context:component-scan base-package="com.atguigu" use-default-filters="false"></context:component-scan>
+
+通过这个方法来指定扫描包，然后只要是有@Controller、@Service、@Repository，@Component注解的类都会被IOC容器生成对象。
+
+现在在前面的MainConfig.java文件中加入@ComponentScans(value="com.atguigu")注解，现在配置类的文件内容如下：
+
+	@Configuration
+	@ComponentScans(value="com.atguigu")
+	public class MainConfig {
+		
+		//给容器中注册一个Bean;类型为返回值的类型，id默认是用方法名作为id
+		@Bean("person")
+		public Person person01(){
+			return new Person("lisi", 20);
+		}
+
+}
+
+这样就取代了之前的xml配置方法。
+
+接下来创建三个类：
+
+BookController.java:
+
+	package com.atguigu.controller;
+	
+	import org.springframework.stereotype.Controller;
+	
+	import com.atguigu.service.BookService;
+	
+	@Controller
+	public class BookController {
+	
+	}
+
+BookService.java:
+
+	package com.atguigu.service;
+	
+	import org.springframework.stereotype.Service;
+	
+	@Service
+	public class BookService {
+		
+	}
+
+BookDao.java:
+
+	package com.atguigu.dao;
+	
+	import org.springframework.stereotype.Repository;
+	
+	@Repository
+	public class BookDao {
+	
+	}
+
+需要注意的是这三个类上的注解，有了这些注解，Spring才会给这几个类创建实例。
+
+接下来编写一个测试类IOCTest.java，加入如下内容：
+
+	package com.atguigu.test;
+	
+	import org.junit.Test;
+	import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+	import com.atguigu.config.MainConfig;
+	
+	public class IOCTest {
+		@SuppressWarnings("resource")
+		@Test
+		public void test01(){
+			AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext(MainConfig.class);
+			String[] definitionNames = applicationContext.getBeanDefinitionNames();
+			for (String name : definitionNames) {
+				System.out.println(name);
+			}
+		}
+	}
+
+该测试方法的作用是打印MainConfig.java中扫描包里的被Spring注册到IOC容器中的对象的类名，测试结果如下：
+
+	org.springframework.context.annotation.internalConfigurationAnnotationProcessor
+	org.springframework.context.annotation.internalAutowiredAnnotationProcessor
+	org.springframework.context.annotation.internalRequiredAnnotationProcessor
+	org.springframework.context.annotation.internalCommonAnnotationProcessor
+	org.springframework.context.event.internalEventListenerProcessor
+	org.springframework.context.event.internalEventListenerFactory
+	mainConfig
+	bookController
+	bookDao
+	bookService
+	person
+
+目录结构如下所示：
+
+![](https://i.niupic.com/images/2019/09/16/_1287.png)
+
+当然也可以设置容器对象的过滤，修改MainConfig.java代码如下：
+
+	//配置类==配置文件
+	@Configuration  //告诉Spring这是一个配置类
+	@ComponentScan(value="com.atguigu", excludeFilters = {
+	        @Filter(type=FilterType.ANNOTATION,classes={Controller.class, Service.class})
+	})
+	
+	public class MainConfig {
+	
+	    //给容器中注册一个Bean;类型为返回值的类型，id默认是用方法名作为id
+	    @Bean("person")
+	    public Person person01(){
+	        return new Person("lisi", 20);
+	    }
+	
+	}
+
+这里使用了
+
+	excludeFilters = {@ComponentScan.Filter(type=FilterType.ANNOTATION,classes={Controller.class, Service.class}}
+
+其中type=FilterType.ANNOTATION是过滤类型，这里是根据注解过滤。然后是classes={Controller.class, Service.class}，这里过滤带有@Controller和@Service的对象。
+
+最后测试的结果如下：
+
+	org.springframework.context.annotation.internalConfigurationAnnotationProcessor
+	org.springframework.context.annotation.internalAutowiredAnnotationProcessor
+	org.springframework.context.annotation.internalRequiredAnnotationProcessor
+	org.springframework.context.annotation.internalCommonAnnotationProcessor
+	org.springframework.context.event.internalEventListenerProcessor
+	org.springframework.context.event.internalEventListenerFactory
+	mainConfig
+	bookDao
+	person
+
+当然，这里也可以指定某些类，而其他类都过滤掉，修改@ComponentScan里面的内容如下：
+
+	@ComponentScan(value="com.atguigu", includeFilters = {
+	        @ComponentScan.Filter(type=FilterType.ANNOTATION,classes={Controller.class, Service.class})
+	},useDefaultFilters = false)
+
+然后运行结果如下：
+
+	org.springframework.context.annotation.internalConfigurationAnnotationProcessor
+	org.springframework.context.annotation.internalAutowiredAnnotationProcessor
+	org.springframework.context.annotation.internalRequiredAnnotationProcessor
+	org.springframework.context.annotation.internalCommonAnnotationProcessor
+	org.springframework.context.event.internalEventListenerProcessor
+	org.springframework.context.event.internalEventListenerFactory
+	mainConfig
+	bookController
+	bookService
+	person
+
+注意设置useDefaultFilters = false。
+
+当然，也可以通过@ComponentScans来重复指定扫描组件策略：
+
+	@ComponentScans(
+	        value = {
+	                @ComponentScan(value="com.atguigu",includeFilters = {
+						@ComponentScan.Filter(type=FilterType.ANNOTATION,classes={Controller.class}),
+	                },useDefaultFilters = false)
+	        }
+	)
+
+打印输出的效果如下所示：
+
+	org.springframework.context.annotation.internalConfigurationAnnotationProcessor
+	org.springframework.context.annotation.internalAutowiredAnnotationProcessor
+	org.springframework.context.annotation.internalRequiredAnnotationProcessor
+	org.springframework.context.annotation.internalCommonAnnotationProcessor
+	org.springframework.context.event.internalEventListenerProcessor
+	org.springframework.context.event.internalEventListenerFactory
+	mainConfig
+	bookController
 	person
