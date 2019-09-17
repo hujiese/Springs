@@ -336,3 +336,111 @@ BookDao.java:
 	mainConfig
 	bookController
 	person
+
+当然也可以用type=FilterType.ASSIGNABLE_TYPE来指定类型：
+
+	@ComponentScans(
+	        value = {
+	                @ComponentScan(value="com.atguigu",includeFilters = {
+						@ComponentScan.Filter(type=FilterType.ANNOTATION,classes={Controller.class}),
+	                     @ComponentScan.Filter(type=FilterType.ASSIGNABLE_TYPE,classes={BookService.class})
+	                },useDefaultFilters = false)
+	        }
+	)
+
+打印输出效果如下:
+
+	org.springframework.context.annotation.internalConfigurationAnnotationProcessor
+	org.springframework.context.annotation.internalAutowiredAnnotationProcessor
+	org.springframework.context.annotation.internalRequiredAnnotationProcessor
+	org.springframework.context.annotation.internalCommonAnnotationProcessor
+	org.springframework.context.event.internalEventListenerProcessor
+	org.springframework.context.event.internalEventListenerFactory
+	mainConfig
+	bookController
+	bookService
+	person
+
+最后介绍自定义Filter，Spring支持使用FilterType.CUSTOM自定义过滤规则。
+
+首先要新建一个实现了TypeFilter接口的实现类，这里是MyTypeFilter.java：
+
+	package com.atguigu.config;
+	
+	import java.io.IOException;
+	
+	import org.springframework.core.io.Resource;
+	import org.springframework.core.type.AnnotationMetadata;
+	import org.springframework.core.type.ClassMetadata;
+	import org.springframework.core.type.classreading.MetadataReader;
+	import org.springframework.core.type.classreading.MetadataReaderFactory;
+	import org.springframework.core.type.filter.TypeFilter;
+
+	public class MyTypeFilter implements TypeFilter {
+	    @Override
+	    public boolean match(MetadataReader metadataReader, MetadataReaderFactory metadataReaderFactory) throws IOException {
+	            // TODO Auto-generated method stub
+	            //获取当前类注解的信息
+	            AnnotationMetadata annotationMetadata = metadataReader.getAnnotationMetadata();
+	            //获取当前正在扫描的类的类信息
+	            ClassMetadata classMetadata = metadataReader.getClassMetadata();
+	            //获取当前类资源（类的路径）
+	            Resource resource = metadataReader.getResource();
+	
+	            String className = classMetadata.getClassName();
+	            System.out.println("--->"+className);
+	            if(className.contains("er")){
+	                return true;
+	            }
+	            return false;
+	    }
+	}
+
+这里设置的规则是扫描类名中存在"er"的类。
+
+然后修改MainConfig.java里的扫描规则：
+
+	@ComponentScans(
+	        value = {
+	                @ComponentScan(value="com.atguigu",includeFilters = {
+	                        @ComponentScan.Filter(type=FilterType.CUSTOM,classes={MyTypeFilter.class})
+	                },useDefaultFilters = false)
+	        }
+	)
+
+最后效果是：
+
+	--->com.atguigu.test.IOCTest
+	--->com.atguigu.bean.Person
+	--->com.atguigu.config.MyTypeFilter
+	--->com.atguigu.controller.BookController
+	--->com.atguigu.dao.BookDao
+	--->com.atguigu.MainTest
+	--->com.atguigu.service.BookService
+
+	...
+	
+	org.springframework.context.annotation.internalConfigurationAnnotationProcessor
+	org.springframework.context.annotation.internalAutowiredAnnotationProcessor
+	org.springframework.context.annotation.internalRequiredAnnotationProcessor
+	org.springframework.context.annotation.internalCommonAnnotationProcessor
+	org.springframework.context.event.internalEventListenerProcessor
+	org.springframework.context.event.internalEventListenerFactory
+	mainConfig
+	person
+	myTypeFilter
+	bookController
+	bookService
+
+
+最后总结过滤规则：
+
+	@ComponentScan  value:指定要扫描的包
+		excludeFilters = Filter[] ：指定扫描的时候按照什么规则排除那些组件
+		includeFilters = Filter[] ：指定扫描的时候只需要包含哪些组件
+		FilterType.ANNOTATION：按照注解
+		FilterType.ASSIGNABLE_TYPE：按照给定的类型；
+		FilterType.ASPECTJ：使用ASPECTJ表达式
+		FilterType.REGEX：使用正则指定
+		FilterType.CUSTOM：使用自定义规则
+### 3、
