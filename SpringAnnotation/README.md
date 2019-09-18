@@ -443,4 +443,195 @@ BookDao.java:
 		FilterType.ASPECTJ：使用ASPECTJ表达式
 		FilterType.REGEX：使用正则指定
 		FilterType.CUSTOM：使用自定义规则
-### 3、
+
+### 3、@Scope设置组件作用域
+
+还是前面的工程，在工程的config目录下新建一个MainConfig2.java文件，里面写入如下内容：
+
+	@Configuration
+	public class MainConfig2 {
+	
+	    @Bean("person")
+	    public Person person01(){
+	        return new Person("zhangsan", 26);
+	    }
+	}
+
+这里也是创建了一个配置类，而且生成Person对象到容器中。
+
+然后在IOCTest.java文件里补充测试方法：
+
+    @Test
+    public void test02(){
+        AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext(MainConfig2.class);
+        String[] definitionNames = applicationContext.getBeanDefinitionNames();
+        for (String name : definitionNames) {
+            System.out.println(name);
+        }
+    }
+
+打印MainConfig2配置中存在的对象，这里输出结果如下：
+
+	org.springframework.context.annotation.internalConfigurationAnnotationProcessor
+	org.springframework.context.annotation.internalAutowiredAnnotationProcessor
+	org.springframework.context.annotation.internalRequiredAnnotationProcessor
+	org.springframework.context.annotation.internalCommonAnnotationProcessor
+	org.springframework.context.event.internalEventListenerProcessor
+	org.springframework.context.event.internalEventListenerFactory
+	mainConfig2
+	person
+
+接下来修改test02测试方法：
+
+    @Test
+    public void test02(){
+        AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext(MainConfig2.class);
+        String[] definitionNames = applicationContext.getBeanDefinitionNames();
+        for (String name : definitionNames) {
+            System.out.println(name);
+        }
+
+        Object bean = applicationContext.getBean("person");
+        Object bean2 = applicationContext.getBean("person");
+        System.out.println(bean == bean2);
+    }
+
+这里通过Bean的ID来获取实例对象bean和bean1，然后判断他们是否是同一个对象，最后输出如下：
+
+	...
+	true
+
+说明上面在配置中只使用@Bean注解的对象在容器中只有一个，即单例对象。Spring中可以使用@Scope来设置对象创建的作用域，有以下几张类型：
+
+- ConfigurableBeanFactory#SCOPE_PROTOTYPE   prototype   
+- @see ConfigurableBeanFactory#SCOPE_SINGLETON    singleton
+- @see org.springframework.web.context.WebApplicationContext#SCOPE_REQUEST  request
+- @see org.springframework.web.context.WebApplicationContext#SCOPE_SESSION	 sesssion
+
+其中：
+
+- prototype：多实例的：ioc容器启动并不会去调用方法创建对象放在容器中。每次获取的时候才会调用方法创建对象；
+- singleton：单实例的（默认值）：ioc容器启动会调用方法创建对象放到ioc容器中。以后每次获取就是直接从容器（map.get()）中拿
+- request：同一次请求创建一个实例
+- session：同一个session创建一个实例
+
+首先测试下prototype，修改MainConfig2中的person01方法，加上注解@Scope("prototype")：
+
+    @Scope("prototype")
+    @Bean("person")
+    public Person person01(){
+        return new Person("zhangsan", 26);
+    }
+
+测试代码运行结果如下：
+
+	...
+	false
+
+### 4、@Lazy-bean懒加载
+
+默认情况下ioc容器启动会调用方法创建对象放到ioc容器中。以后每次获取就是直接从容器（map.get()）中拿，设计模式里面称为单例模式的“饿汉式”。如果在创建实例上添加@Lazy标签，那么就变成“懒汉式”了：
+
+    @Lazy
+    @Bean("person")
+    public Person person01(){
+        return new Person("zhangsan", 26);
+    }
+
+容器启动不创建对象。第一次使用才(获取)Bean创建对象，并初始化。
+
+### 5、@Conditional-按照条件注册bean
+
+为了方便演示，这里在MainConfig2中添加两个Bean：
+
+	@Bean("bill")
+	public Person person01(){
+		return new Person("Bill Gates",62);
+	}
+	
+	@Bean("linus")
+	public Person person02(){
+		return new Person("linus", 48);
+	}
+
+分别取名叫"bill"和"linus"。现在需求是，如果系统是windows，给容器中注册("bill")，如果是linux系统，给容器中注册("linus")。
+
+为了实现该需求，我们需要使用@Conditional标签来实现条件注册，@Conditional需要设置条件类，该条件类需要实现Condition接口并覆写public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata)方法。
+
+首先在com.atguigu下创建condition包，在里面创建两个类WindowsCondition和LinuxCondition。
+
+WindowsCondition.java内容如下：
+
+	public class WindowsCondition implements Condition {
+	
+		@Override
+		public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+			Environment environment = context.getEnvironment();
+			String property = environment.getProperty("os.name");
+			if(property.contains("Windows")){
+				return true;
+			}
+			return false;
+		}
+	
+	}
+
+这里根据context上下文获取到系统的名字，如果是Windows系统则返回true，否则返回false。
+
+接下来创建一个LinuxCondition：
+
+	//判断是否linux系统
+	public class LinuxCondition implements Condition {
+	
+		/**
+		 * ConditionContext：判断条件能使用的上下文（环境）
+		 * AnnotatedTypeMetadata：注释信息
+		 */
+		@Override
+		public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+			// TODO是否linux系统
+			//1、能获取到ioc使用的beanfactory
+			ConfigurableListableBeanFactory beanFactory = context.getBeanFactory();
+			//2、获取类加载器
+			ClassLoader classLoader = context.getClassLoader();
+			//3、获取当前环境信息
+			Environment environment = context.getEnvironment();
+			//4、获取到bean定义的注册类
+			BeanDefinitionRegistry registry = context.getRegistry();
+			
+			String property = environment.getProperty("os.name");
+			
+			//可以判断容器中的bean注册情况，也可以给容器中注册bean
+			boolean definition = registry.containsBeanDefinition("person");
+			if(property.contains("linux")){
+				return true;
+			}
+			
+			return false;
+		}
+	
+	}
+
+这里只在系统是Linux的情况下返回true。
+
+然后在IOCTest.java里添加
+
+    AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext(MainConfig2.class);
+
+    @Test
+    public void test03(){
+        Map<String, Person> persons = applicationContext.getBeansOfType(Person.class);
+        System.out.println(persons);
+    }
+
+打印结果如下:
+
+	{person=Person [name=zhangsan, age=26, nickName=null], bill=Person [name=Bill Gates, age=62, nickName=null]}
+
+当然也可以在配置类上增加这个标签：
+
+	@Conditional({WindowsCondition.class})
+	@Configuration
+	public class MainConfig2 {}
+
+效果是一样的。
