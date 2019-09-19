@@ -1,4 +1,4 @@
-## Spring注解开发笔记
+## Spring注解开发笔记--组件注册
 
 Spring可以使用XML配置的方法向IOC容器中注入bean，但是这种方法有些繁琐和不便，于是便有了使用注解驱动开发的方式，在Spring Boot和Spring Cloud中也是推荐使用注解开发。
 
@@ -635,3 +635,279 @@ WindowsCondition.java内容如下：
 	public class MainConfig2 {}
 
 效果是一样的。
+
+### 6、@Import-给容器中快速导入一个组件
+
+在bean目录下创建两个类Color和Red。
+
+Color.java内容如下：
+
+	package com.atguigu.bean;
+	
+	public class Color {
+	}
+
+Red.java内容如下：
+
+	package com.atguigu.bean;
+	
+	public class Color {
+	}
+
+然后再MainConfig2.java中加入注解：
+
+	@Import({Color.class, Red.class})
+	public class MainConfig2 {}
+
+通过@Import倒入一个数组，这里导入了Color和Red两个类，然后再IOCTest.java中编写如下测试程序：
+
+    AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext(MainConfig2.class);
+
+    @Test
+    public void testImport(){
+        printBeans(applicationContext);
+    }
+
+    private void printBeans(AnnotationConfigApplicationContext applicationContext){
+        String[] definitionNames = applicationContext.getBeanDefinitionNames();
+        for(String name : definitionNames){
+            System.out.println(name);
+        }
+    }
+
+打印输出结果包含：
+
+	...
+	com.atguigu.bean.Color
+	com.atguigu.bean.Red
+	...
+
+这样便向IOC容器中导入了两个类。
+
+当然，也可以通过ImportSelector的方式来将类导入到容器中。
+
+接下来继续向bean目录中添加Blue和Yellow两个类。
+
+Blue.java内容如下：
+
+	package com.atguigu.bean;
+	
+	public class Blue {
+	}
+
+Yellow.java内容如下：
+
+	package com.atguigu.bean;
+	
+	public class Yellow {
+	}
+
+如果要使用ImportSelector，还需要一个实现了ImportSelector接口的类，在condition目录里添加MyImportSelector类：
+
+	package com.atguigu.condition;
+	
+	import org.springframework.context.annotation.ImportSelector;
+	import org.springframework.core.type.AnnotationMetadata;
+	
+	//自定义逻辑返回需要导入的组件
+	public class MyImportSelector implements ImportSelector {
+	
+		//返回值，就是到导入到容器中的组件全类名
+		//AnnotationMetadata:当前标注@Import注解的类的所有注解信息
+		@Override
+		public String[] selectImports(AnnotationMetadata importingClassMetadata) {
+			// TODO Auto-generated method stub
+			//importingClassMetadata
+			//方法不要返回null值
+			return new String[]{"com.atguigu.bean.Blue","com.atguigu.bean.Yellow"};
+		}
+	
+	}
+
+该类需要实现ImportSelector的public String[] selectImports(AnnotationMetadata importingClassMetadata)方法，然后在该方法中返回需要导入到IOC容器中的类的全类名。
+
+接下来修改MainConfig2.java中的@Import注解：
+
+	@Import({Color.class, Red.class, MyImportSelector.class})
+
+将我们编写的MyImportSelector添加到注解里，然后修改测试函数testImport()，内容如下：
+
+    @Test
+    public void testImport(){
+        printBeans(applicationContext);
+
+        Blue bean = applicationContext.getBean(Blue.class);
+        System.out.println(bean);
+    }
+
+输出结果中包含：
+
+	...
+	com.atguigu.bean.Blue
+	com.atguigu.bean.Yellow
+	...
+	com.atguigu.bean.Blue@69930714
+
+可见，Blue和Yellow两个类已经导入到IOC容器中了，用Import方式导入的Bean的Id默认是全类名。
+
+对于@Import，这里最后介绍使用MyImportBeanDefinitionRegistrar导入组件的方法。
+
+首先我们需要添加一个类RainBow：
+
+	package com.atguigu.bean;
+	
+	public class RainBow {
+	}
+
+然后编写一个实现了ImportBeanDefinitionRegistrar接口的类MyImportBeanDefinitionRegistrar，并覆写public void registerBeanDefinitions(AnnotationMetadata importingClassMetadata, BeanDefinitionRegistry registry)方法：
+
+	package com.atguigu.condition;
+	
+	import org.springframework.beans.factory.support.BeanDefinitionRegistry;
+	import org.springframework.beans.factory.support.RootBeanDefinition;
+	import org.springframework.context.annotation.ImportBeanDefinitionRegistrar;
+	import org.springframework.core.type.AnnotationMetadata;
+	
+	import com.atguigu.bean.RainBow;
+	
+	public class MyImportBeanDefinitionRegistrar implements ImportBeanDefinitionRegistrar {
+	
+		/**
+		 * AnnotationMetadata：当前类的注解信息
+		 * BeanDefinitionRegistry:BeanDefinition注册类；
+		 * 		把所有需要添加到容器中的bean；调用
+		 * 		BeanDefinitionRegistry.registerBeanDefinition手工注册进来
+		 */
+		@Override
+		public void registerBeanDefinitions(AnnotationMetadata importingClassMetadata, BeanDefinitionRegistry registry) {
+			
+			boolean definition = registry.containsBeanDefinition("com.atguigu.bean.Red");
+			boolean definition2 = registry.containsBeanDefinition("com.atguigu.bean.Blue");
+			if(definition && definition2){
+				//指定Bean定义信息；（Bean的类型，Bean。。。）
+				RootBeanDefinition beanDefinition = new RootBeanDefinition(RainBow.class);
+				//注册一个Bean，指定bean名
+				registry.registerBeanDefinition("rainBow", beanDefinition);
+			}
+		}
+	
+	}
+
+在registerBeanDefinitions方法的参数里有BeanDefinitionRegistry对象，首先调用了该对象的BeanDefinitionRegistry()方法，通过传入某个类的全类名来判断该类是否存在于IOC容器中，这里判断Red和Blue两个类，如果两个类都存在与IOC容器中，则通过：
+
+	RootBeanDefinition beanDefinition = new RootBeanDefinition(RainBow.class);
+	registry.registerBeanDefinition("rainBow", beanDefinition);
+
+将我们前面创建的RainBow类导入到IOC容器中。
+
+修改MainConfig2.java中的@Import标签内容如下：
+
+	@Import({Color.class, Red.class, MyImportSelector.class,MyImportBeanDefinitionRegistrar.class})
+
+然后通过IOCTest.java中的testImport()方法来测试RainBow类是否注册到IOC容器中，最后测试结果包含：
+
+	...
+	rainBow
+	...
+
+说明导入成功。
+
+### 7、使用FactoryBean注册组件
+
+下面将对于Color类来使用工厂方法注册组件。这里创建了一个类ColorFactoryBean，该类实现了FactoryBean<Color>接口：
+
+	package com.atguigu.bean;
+	
+	import org.springframework.beans.factory.FactoryBean;
+	
+	//创建一个Spring定义的FactoryBean
+	public class ColorFactoryBean implements FactoryBean<Color> {
+	
+		//返回一个Color对象，这个对象会添加到容器中
+		@Override
+		public Color getObject() throws Exception {
+			// TODO Auto-generated method stub
+			System.out.println("ColorFactoryBean...getObject...");
+			return new Color();
+		}
+	
+		@Override
+		public Class<?> getObjectType() {
+			// TODO Auto-generated method stub
+			return Color.class;
+		}
+	
+		//是单例？
+		//true：这个bean是单实例，在容器中保存一份
+		//false：多实例，每次获取都会创建一个新的bean；
+		@Override
+		public boolean isSingleton() {
+			// TODO Auto-generated method stub
+			return false;
+		}
+	
+	}
+
+然后在MainConfig2.java中添加如下代码：
+
+    @Bean
+    public ColorFactoryBean colorFactoryBean(){
+        return new ColorFactoryBean();
+    }
+
+最后修改IOCTest.java中的testImport()方法：
+
+    @Test
+    public void testImport(){
+        printBeans(applicationContext);
+
+        Blue bean = applicationContext.getBean(Blue.class);
+        System.out.println(bean);
+
+        //工厂Bean获取的是调用getObject创建的对象
+        Object bean2 = applicationContext.getBean("colorFactoryBean");
+        Object bean3 = applicationContext.getBean("colorFactoryBean");
+        System.out.println("bean的类型："+bean2.getClass());
+        System.out.println(bean2 == bean3);
+
+        Object bean4 = applicationContext.getBean("&colorFactoryBean");
+        System.out.println(bean4.getClass());
+    }
+
+测试的输出如下：
+
+	ColorFactoryBean...getObject...
+	ColorFactoryBean...getObject...
+	the type of bean is:class com.atguigu.bean.Color
+	false
+	class com.atguigu.bean.ColorFactoryBean
+
+由于我们设置了：
+
+	@Override
+	public boolean isSingleton() {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+返回值是false，所以工厂返回的Bean不是单例，每次获取该FactoryBean时都会实例化一个Color对象。
+
+### 8、总结
+
+给Spring容器中注册组方法：
+
+- 1）、包扫描+组件标注注解（@Controller/@Service/@Repository/@Component）[自己写的类]
+- 2）、@Bean[导入的第三方包里面的组件]
+- 3）、@Import[快速给容器中导入一个组件]
+
+		a）、@Import(要导入到容器中的组件)；容器中就会自动注册这个组件，id默认是全类名
+		b）、ImportSelector:返回需要导入的组件的全类名数组；
+		c）、ImportBeanDefinitionRegistrar:手动注册bean到容器中
+
+- 4）、使用Spring提供的 FactoryBean（工厂Bean）;
+
+		a）、默认获取到的是工厂bean调用getObject创建的对象
+		b）、要获取工厂Bean本身，我们需要给id前面加一个&
+			&colorFactoryBean
+
+
