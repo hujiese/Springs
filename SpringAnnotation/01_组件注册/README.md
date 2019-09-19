@@ -614,6 +614,16 @@ WindowsCondition.java内容如下：
 
 这里只在系统是Linux的情况下返回true。
 
+修改MainConfig2.java内容：
+
+	...
+	@Conditional({WindowsCondition.class})
+	@Bean("bill")
+	...
+    @Conditional(LinuxCondition.class)
+    @Bean("linus")
+	...
+
 然后在IOCTest.java里添加
 
     AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext(MainConfig2.class);
