@@ -1,3 +1,14 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [Spring注解开发笔记--生命周期](#spring%E6%B3%A8%E8%A7%A3%E5%BC%80%E5%8F%91%E7%AC%94%E8%AE%B0--%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F)
+  - [1、@Bean指定初始化和销毁方法](#1bean%E6%8C%87%E5%AE%9A%E5%88%9D%E5%A7%8B%E5%8C%96%E5%92%8C%E9%94%80%E6%AF%81%E6%96%B9%E6%B3%95)
+  - [2、InitializingBean和DisposableBean](#2initializingbean%E5%92%8Cdisposablebean)
+  - [3、@PostConstruct和@PreDestroy](#3postconstruct%E5%92%8Cpredestroy)
+  - [4、BeanPostProcessor-后置处理器](#4beanpostprocessor-%E5%90%8E%E7%BD%AE%E5%A4%84%E7%90%86%E5%99%A8)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## Spring注解开发笔记--生命周期
 
 ### 1、@Bean指定初始化和销毁方法

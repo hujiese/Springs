@@ -1,3 +1,12 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [Spring注解开发笔记--属性赋值](#spring%E6%B3%A8%E8%A7%A3%E5%BC%80%E5%8F%91%E7%AC%94%E8%AE%B0--%E5%B1%9E%E6%80%A7%E8%B5%8B%E5%80%BC)
+  - [1、@Value赋值](#1value%E8%B5%8B%E5%80%BC)
+  - [2、@PropertySource读取外部配置](#2propertysource%E8%AF%BB%E5%8F%96%E5%A4%96%E9%83%A8%E9%85%8D%E7%BD%AE)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## Spring注解开发笔记--属性赋值
 
 ### 1、@Value赋值

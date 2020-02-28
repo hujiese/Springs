@@ -1,10 +1,27 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [Spring注解开发笔记--组件注册](#spring%E6%B3%A8%E8%A7%A3%E5%BC%80%E5%8F%91%E7%AC%94%E8%AE%B0--%E7%BB%84%E4%BB%B6%E6%B3%A8%E5%86%8C)
+  - [1、注解开发](#1%E6%B3%A8%E8%A7%A3%E5%BC%80%E5%8F%91)
+    - [xml配置方式](#xml%E9%85%8D%E7%BD%AE%E6%96%B9%E5%BC%8F)
+    - [注解驱动开发](#%E6%B3%A8%E8%A7%A3%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91)
+  - [2、@ComponentScan自动扫描组件](#2componentscan%E8%87%AA%E5%8A%A8%E6%89%AB%E6%8F%8F%E7%BB%84%E4%BB%B6)
+  - [3、@Scope设置组件作用域](#3scope%E8%AE%BE%E7%BD%AE%E7%BB%84%E4%BB%B6%E4%BD%9C%E7%94%A8%E5%9F%9F)
+  - [4、@Lazy-bean懒加载](#4lazy-bean%E6%87%92%E5%8A%A0%E8%BD%BD)
+  - [5、@Conditional-按照条件注册bean](#5conditional-%E6%8C%89%E7%85%A7%E6%9D%A1%E4%BB%B6%E6%B3%A8%E5%86%8Cbean)
+  - [6、@Import-给容器中快速导入一个组件](#6import-%E7%BB%99%E5%AE%B9%E5%99%A8%E4%B8%AD%E5%BF%AB%E9%80%9F%E5%AF%BC%E5%85%A5%E4%B8%80%E4%B8%AA%E7%BB%84%E4%BB%B6)
+  - [7、使用FactoryBean注册组件](#7%E4%BD%BF%E7%94%A8factorybean%E6%B3%A8%E5%86%8C%E7%BB%84%E4%BB%B6)
+  - [8、总结](#8%E6%80%BB%E7%BB%93)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## Spring注解开发笔记--组件注册
 
 Spring可以使用XML配置的方法向IOC容器中注入bean，但是这种方法有些繁琐和不便，于是便有了使用注解驱动开发的方式，在Spring Boot和Spring Cloud中也是推荐使用注解开发。
 
 ### 1、注解开发
 
-#### 首先看一个例子，这个例子使用传统的xml配置方式开发。
+#### xml配置方式
 
 首先创建一个Person类：
 
@@ -100,7 +117,7 @@ public class MainTest {
 
 	Person [name=zhangsan, age=18, nickName=null]
 
-#### 接下来是使用注解驱动开发
+#### 注解驱动开发
 
 同样的Person类，使用xml开发方式需要在xml中配置该实例的属性，但使用注解开发推荐使用创建配置类的方式。
 

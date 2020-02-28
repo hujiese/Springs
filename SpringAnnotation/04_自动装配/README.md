@@ -1,3 +1,15 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [Spring注解开发笔记--自动装配](#spring%E6%B3%A8%E8%A7%A3%E5%BC%80%E5%8F%91%E7%AC%94%E8%AE%B0--%E8%87%AA%E5%8A%A8%E8%A3%85%E9%85%8D)
+  - [1、@Autowired、@Qualifier和@Primary](#1autowiredqualifier%E5%92%8Cprimary)
+  - [2、@Resource和@Inject](#2resource%E5%92%8Cinject)
+  - [3、@Autowire--方法、构造器位置的自动装配](#3autowire--%E6%96%B9%E6%B3%95%E6%9E%84%E9%80%A0%E5%99%A8%E4%BD%8D%E7%BD%AE%E7%9A%84%E8%87%AA%E5%8A%A8%E8%A3%85%E9%85%8D)
+  - [4、@Profile](#4profile)
+  - [5、自动装配总结](#5%E8%87%AA%E5%8A%A8%E8%A3%85%E9%85%8D%E6%80%BB%E7%BB%93)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## Spring注解开发笔记--自动装配
 
 ### 1、@Autowired、@Qualifier和@Primary
