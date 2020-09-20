@@ -1463,3 +1463,174 @@ System.out.println(person);
 Person{name='Tom', car=Car{brand='BWM', price=30000.0, tyrePerimeter=31.41592653589793}, city='BeiJing', info='白领'}
 ```
 
+### 11、IOC 容器中 Bean 的生命周期方法
+
+#### （1）生命周期方法
+
+Spring IOC 容器可以管理 Bean 的生命周期，Spring 允许在 Bean 生命周期的特定点执行定制的任务。
+Spring IOC 容器对 Bean 的生命周期进行管理的过程:
+
+* 通过构造器或工厂方法创建 Bean 实例
+* 为 Bean 的属性设置值和对其他 Bean 的引用
+* 调用 Bean 的初始化方法
+* Bean 可以使用了
+* 当容器关闭时, 调用 Bean 的销毁方法
+
+在com.jack.spring目录下创建一个包cycle，添加Car类：
+
+```java
+public class Car {
+
+    private String brand;
+
+    public Car(){
+        System.out.println("car's Constructor ...");
+    }
+
+    public void setBrand(String brand) {
+        System.out.println("setBrand ....");
+        this.brand = brand;
+    }
+
+    public void init(){
+        System.out.println("init ....");
+    }
+
+    public void destroy(){
+        System.out.println("destroy ....");
+    }
+}
+```
+
+创建一个spring配置文件 beans-cycle.xml，在 Bean 的声明里设置 init-method 和 destroy-method 属性, 为 Bean 指定初始化和销毁方法：
+
+```xml
+    <bean id="car" class="com.jack.spring.cycle.Car" init-method="init" destroy-method="destroy">
+        <property name="brand" value="BWM"></property>
+    </bean>
+```
+
+创建测试Main类：
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        ApplicationContext ctx = new ClassPathXmlApplicationContext("beans-cycle.xml");
+        Car car = (Car)ctx.getBean("car");
+        System.out.println(car);
+
+        ((ClassPathXmlApplicationContext) ctx).close();
+    }
+}
+```
+
+测试结果如下：
+
+```
+car's Constructor ...
+setBrand ....
+init ....
+Car{brand='BWM'}
+destroy ....
+```
+
+#### （2）创建 Bean 后置处理器
+
+Bean 后置处理器允许在调用初始化方法前后对 Bean 进行额外的处理。
+
+Bean 后置处理器对 IOC 容器里的所有 Bean 实例逐一处理，而非单一实例。其典型应用是：检查 Bean 属性的正确性或根据特定的标准更改 Bean 的属性。
+对Bean 后置处理器而言, 需要实现 **BeanPostProcessor** 接口. 在初始化方法被调用前后, Spring 将把每个 Bean 实例分别传递给上述接口的以下两个方法：
+
+```java
+public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+}
+
+public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+}
+```
+
+其中：
+
+* postProcessBeforeInitialization 在 init-methond之前被调用
+* postProcessAfterInitialization 在 init-methond之后被调用
+* 参数 bean是bean实例本身
+* 参数 beanName 是IOC容器中配置的bean的id
+* 返回值实际上是给用户的那个Bean，可以在上面两个方法中修改返回的bean，甚至创建返回一个新的bean
+
+新建一个类 MyBeanPostProcessor，添加：
+
+```java
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.config.BeanPostProcessor;
+
+public class MyBeanPostProcessor implements BeanPostProcessor {
+
+    @Override
+    public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+        System.out.println("postProcessBeforeInitialization: " + bean + ", " + beanName);
+        return bean;
+    }
+
+    @Override
+    public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+        System.out.println("postProcessAfterInitialization: " +  bean + ", " + beanName);
+        return bean;
+    }
+}
+```
+
+修改配置文件，加入：
+
+```xml
+<bean class="com.jack.spring.cycle.MyBeanPostProcessor"></bean>
+```
+
+该后置处理器不需要配置id，IOC容器自动将其识别为一个 BeanPostProcessor，该BeanPostProcessor对全局Bean有效。
+
+重新运行测试程序，结果如下：
+
+```
+car's Constructor ...
+setBrand ....
+postProcessBeforeInitialization: Car{brand='BWM'}, car
+init ....
+postProcessAfterInitialization: Car{brand='BWM'}, car
+Car{brand='BWM'}
+destroy ....
+```
+
+接下来继续修改代码，修改 MyBeanPostProcessor 中的 postProcessAfterInitialization 方法：
+
+```java
+    @Override
+    public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+        System.out.println("postProcessAfterInitialization: " +  bean + ", " + beanName);
+        Car car = new Car();
+        car.setBrand("Ford");
+        return car;
+    }
+```
+
+测试结果如下：
+
+```
+car's Constructor ...
+setBrand ....
+postProcessBeforeInitialization: Car{brand='BWM'}, car
+init ....
+postProcessAfterInitialization: Car{brand='BWM'}, car
+car's Constructor ...
+setBrand ....
+Car{brand='Ford'}
+destroy ....
+```
+
+总结一下，Spring IOC 容器对 Bean 的生命周期进行管理的过程：
+
+* 通过构造器或工厂方法创建 Bean 实例
+* 为 Bean 的属性设置值和对其他 Bean 的引用
+* 将 Bean 实例传递给 Bean 后置处理器的 postProcessBeforeInitialization 方法
+* 调用 Bean 的初始化方法
+* 将 Bean 实例传递给 Bean 后置处理器的 postProcessAfterInitialization方法
+* Bean 可以使用了
+* 当容器关闭时, 调用 Bean 的销毁方法
