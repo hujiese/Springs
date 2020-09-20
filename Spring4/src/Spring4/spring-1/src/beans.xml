@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:util="http://www.springframework.org/schema/util"
+       xmlns:p="http://www.springframework.org/schema/p"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/util https://www.springframework.org/schema/util/spring-util.xsd">
+
+    <!-- 配置一个 bean
+         class: bean的全类名，通过反射的方式在IOC容器中建立Bean，所以Bean中必须有无参的构造器
+          id: 标识容器中的bean，id 唯一-->
+   <bean id="helloWorld" class="com.jack.spring.helloworld.HelloWorld">
+            <!--为属性赋值-->
+            <property name="user" value="Jerry"></property>
+   </bean>
+
+    <!-- 若一个 bean 有多个构造器, 如何通过构造器来为 bean 的属性赋值 -->
+    <!-- 可以根据 index 和 value 进行更加精确的定位.  -->
+    <bean id="car" class="com.jack.spring.helloworld.Car">
+        <constructor-arg value="KUGA" index="0"></constructor-arg>
+        <constructor-arg value="ChangAnFord" index="1"></constructor-arg>
+        <constructor-arg value="250000" index="2"></constructor-arg>
+    </bean>
+
+    <!--也可以根据参数的类型来区分重载的构造器-->
+    <bean id="car2" class="com.jack.spring.helloworld.Car">
+        <constructor-arg value="KUGA" type="java.lang.String"></constructor-arg>
+        <constructor-arg type="java.lang.String">
+            <!-- 若字面值中包含特殊字符, 则可以使用 <![CDATA[]]> 来进行赋值，下面的值是 <ChangAnFord> -->
+            <!--属性值可以使用value子节点来进行赋值-->
+            <value><![CDATA[<ChangAnFord>]]></value>
+        </constructor-arg>
+        <constructor-arg value="24" type="float"></constructor-arg>
+    </bean>
+
+    <bean id="person" class="com.jack.spring.helloworld.Person">
+        <property name="age" value="12"></property>
+        <property name="name" value="jack"></property>
+        <!--外部注入，引用类的外部对象-->
+        <!--<property name="car" >-->
+            <!--<ref bean="car2"/>-->
+        <!--</property>-->
+        <!--<property name="car" ref="car2"></property>-->
+        <!--内部注入，相当于创建了一个类的局部私有变量，外部不可访问-->
+        <property name="car">
+            <bean class="com.jack.spring.helloworld.Car">
+                <constructor-arg value="KUGA" index="0"></constructor-arg>
+                <constructor-arg value="ChangAnFord" index="1"></constructor-arg>
+                <constructor-arg value="250000" index="2"></constructor-arg>
+            </bean>
+        </property>
+    </bean>
+
+    <bean id="person2" class="com.jack.spring.helloworld.Person">
+        <constructor-arg value="14" index="0"></constructor-arg>
+        <constructor-arg value="jack" index="1"></constructor-arg>
+        <constructor-arg ref="car"></constructor-arg>
+        <property name="car.maxSpeed" value="250"></property>
+        <!--<constructor-arg><null/></constructor-arg>-->
+    </bean>
+
+    <!--集合属性-->
+    <bean id="person3" class="com.jack.spring.collections.Person">
+        <property name="name" value="jack"></property>
+        <property name="age" value="23"></property>
+        <property name="cars">
+            <list>
+                <ref bean="car"></ref>
+                <ref bean="car2"></ref>
+                <bean class="com.jack.spring.helloworld.Car">
+                    <constructor-arg value="KUGA" index="0"></constructor-arg>
+                    <constructor-arg value="ChangAnFord" index="1"></constructor-arg>
+                    <constructor-arg value="260000" index="2"></constructor-arg>
+                </bean>
+            </list>
+        </property>
+    </bean>
+
+    <!--map属性赋值-->
+    <bean id="person4" class="com.jack.spring.collections.NewPerson">
+        <property name="age" value="25"></property>
+        <property name="name" value="mark"></property>
+        <property name="cars">
+            <map>
+                <entry key="no1" value-ref="car"></entry>
+                <entry key="no2" value-ref="car2"></entry>
+            </map>
+        </property>
+    </bean>
+
+    <!--为Properties赋值-->
+    <bean id="dataSource" class="com.jack.spring.collections.DataSource">
+        <property name="properties">
+            <props>
+                <prop key="user">root</prop>
+                <prop key="password">123</prop>
+                <prop key="jdbcUrl">jdbc:mysql:///test</prop>
+                <prop key="driverClass">com.mysql.jdbc.Driver</prop>
+            </props>
+        </property>
+    </bean>
+
+    <!--配置单例的集合bean，以提供多个bean进行引用，这里需要导入util命名空间-->
+    <util:list id="cars">
+        <ref bean="car"></ref>
+        <ref bean="car2"></ref>
+    </util:list>
+
+    <bean id="person5" class="com.jack.spring.collections.Person">
+        <property name="name" value="jackster"></property>
+        <property name="age" value="25"></property>
+        <property name="cars" ref="cars"></property>
+    </bean>
+
+    <bean id="person6" class="com.jack.spring.collections.Person" p:age="35" p:name="marry" p:cars-ref="cars"></bean>
+</beans>

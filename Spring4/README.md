@@ -1,6 +1,7 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
+
 - [Spring4学习](#spring4%E5%AD%A6%E4%B9%A0)
   - [一、配置Bean](#%E4%B8%80%E9%85%8D%E7%BD%AEbean)
     - [1、property注入属性](#1property%E6%B3%A8%E5%85%A5%E5%B1%9E%E6%80%A7)
@@ -26,6 +27,10 @@
       - [（2）依赖](#2%E4%BE%9D%E8%B5%96)
     - [8、bean 的作用域](#8bean-%E7%9A%84%E4%BD%9C%E7%94%A8%E5%9F%9F)
     - [9、使用外部属性文件](#9%E4%BD%BF%E7%94%A8%E5%A4%96%E9%83%A8%E5%B1%9E%E6%80%A7%E6%96%87%E4%BB%B6)
+    - [10、SpEL](#10spel)
+      - [（1）使用spel为属性配置一个字面值](#1%E4%BD%BF%E7%94%A8spel%E4%B8%BA%E5%B1%9E%E6%80%A7%E9%85%8D%E7%BD%AE%E4%B8%80%E4%B8%AA%E5%AD%97%E9%9D%A2%E5%80%BC)
+      - [（2）使用spel引用类的静态属性](#2%E4%BD%BF%E7%94%A8spel%E5%BC%95%E7%94%A8%E7%B1%BB%E7%9A%84%E9%9D%99%E6%80%81%E5%B1%9E%E6%80%A7)
+      - [（3）使用spel引用其他bean的属性和使用表达式](#3%E4%BD%BF%E7%94%A8spel%E5%BC%95%E7%94%A8%E5%85%B6%E4%BB%96bean%E7%9A%84%E5%B1%9E%E6%80%A7%E5%92%8C%E4%BD%BF%E7%94%A8%E8%A1%A8%E8%BE%BE%E5%BC%8F)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -1231,5 +1236,230 @@ public class Main {
 
 ```
 DataSource{user='root', password='1230', driverClass='com.mysql.jdbc.Driver', jdbcUrl='jdbc:mysql:///test'}
+```
+
+### 10、SpEL
+
+Spring 表达式语言（简称SpEL）：是一个支持运行时查询和操作对象图的强大的表达式语言。语法类似于 EL：SpEL 使用 #{…} 作为定界符，所有在大框号中的字符都将被认为是 SpEL。SpEL 为 bean 的属性进行动态赋值提供了便利。
+通过 SpEL 可以实现：
+
+* 通过 bean 的 id 对 bean 进行引用
+* 调用方法以及引用对象中的属性
+* 计算表达式的值
+* 正则表达式的匹配
+
+在 com.jack.spring 下创建一个包spel，添加Address、Car和Person三个类：
+
+```java
+public class Address {
+    private String city;
+    private String street;
+
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+    public String getStreet() {
+        return street;
+    }
+
+    public void setStreet(String street) {
+        this.street = street;
+    }
+
+    @Override
+    public String toString() {
+        return "Address{" +
+                "city='" + city + '\'' +
+                ", street='" + street + '\'' +
+                '}';
+    }
+}
+```
+
+```java
+public class Car {
+
+    private String brand;
+    private double price;
+    //轮胎周长
+    private double tyrePerimeter;
+
+    public String getBrand() {
+        return brand;
+    }
+
+    public void setBrand(String brand) {
+        this.brand = brand;
+    }
+
+    public double getPrice() {
+        return price;
+    }
+
+    public void setPrice(double price) {
+        this.price = price;
+    }
+
+    public double getTyrePerimeter() {
+        return tyrePerimeter;
+    }
+
+    public void setTyrePerimeter(double tyrePerimeter) {
+        this.tyrePerimeter = tyrePerimeter;
+    }
+
+    @Override
+    public String toString() {
+        return "Car{" +
+                "brand='" + brand + '\'' +
+                ", price=" + price +
+                ", tyrePerimeter=" + tyrePerimeter +
+                '}';
+    }
+}
+```
+
+```java
+public class Person {
+    private String name;
+    private Car car;
+
+    // 引用address 的city属性
+    private String city;
+
+    // 根据car的price确定inof：car 的 price >= 300000 则为金领，否则为白领
+    private String info;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Car getCar() {
+        return car;
+    }
+
+    public void setCar(Car car) {
+        this.car = car;
+    }
+
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+    public String getInfo() {
+        return info;
+    }
+
+    public void setInfo(String info) {
+        this.info = info;
+    }
+
+    @Override
+    public String toString() {
+        return "Person{" +
+                "name='" + name + '\'' +
+                ", car=" + car +
+                ", city='" + city + '\'' +
+                ", info='" + info + '\'' +
+                '}';
+    }
+}
+```
+
+#### （1）使用spel为属性配置一个字面值
+
+添加一个spring配置文件 beans-spel.xml，加入：
+
+```xml
+    <bean id="address" class="com.jack.spring.spel.Address">
+        <property name="city" value="#{'BeiJing'}"></property>
+        <property name="street" value="WuDaoKou"></property>
+    </bean>
+```
+
+city属性采用了#{}方式赋值。
+
+创建测试Main类：
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        ApplicationContext ctx = new ClassPathXmlApplicationContext("beans-spel.xml");
+        Address address = (Address)ctx.getBean("address");
+        System.out.println(address);
+    }
+}
+```
+
+测试结果如下：
+
+```
+Address{city='BeiJing', street='WuDaoKou'}
+```
+
+#### （2）使用spel引用类的静态属性
+
+向配置文件中加入：
+
+```xml
+    <bean id="car" class="com.jack.spring.spel.Car">
+        <property name="brand" value="BWM"></property>
+        <property name="price" value="30000"></property>
+        <property name="tyrePerimeter" value="#{T(java.lang.Math).PI * 10}"></property>
+    </bean>
+```
+
+修改测试main方法：
+
+```java
+ApplicationContext ctx = new ClassPathXmlApplicationContext("beans-spel.xml");
+Car car = (Car)ctx.getBean("car");
+System.out.println(car);
+```
+
+测试结果如下：
+
+```
+Car{brand='BWM', price=30000.0, tyrePerimeter=31.41592653589793}
+```
+
+#### （3）使用spel引用其他bean的属性和使用表达式
+
+修改配置文件，加入：
+
+```xml
+    <bean id="person" class="com.jack.spring.spel.Person">
+        <property name="car" value="#{car}"></property>
+        <property name="city" value="#{address.city}"></property>
+        <property name="info" value="#{ car.price > 50000 ? '金领' : '白领'}"></property>
+        <property name="name" value="Tom"></property>
+    </bean>
+```
+
+修改测试main方法：
+
+```java
+ApplicationContext ctx = new ClassPathXmlApplicationContext("beans-spel.xml");
+Person person = (Person)ctx.getBean("person");
+System.out.println(person);
+```
+
+测试结果如下：
+
+```
+Person{name='Tom', car=Car{brand='BWM', price=30000.0, tyrePerimeter=31.41592653589793}, city='BeiJing', info='白领'}
 ```
 
