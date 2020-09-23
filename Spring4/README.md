@@ -31,6 +31,13 @@
       - [（1）使用spel为属性配置一个字面值](#1%E4%BD%BF%E7%94%A8spel%E4%B8%BA%E5%B1%9E%E6%80%A7%E9%85%8D%E7%BD%AE%E4%B8%80%E4%B8%AA%E5%AD%97%E9%9D%A2%E5%80%BC)
       - [（2）使用spel引用类的静态属性](#2%E4%BD%BF%E7%94%A8spel%E5%BC%95%E7%94%A8%E7%B1%BB%E7%9A%84%E9%9D%99%E6%80%81%E5%B1%9E%E6%80%A7)
       - [（3）使用spel引用其他bean的属性和使用表达式](#3%E4%BD%BF%E7%94%A8spel%E5%BC%95%E7%94%A8%E5%85%B6%E4%BB%96bean%E7%9A%84%E5%B1%9E%E6%80%A7%E5%92%8C%E4%BD%BF%E7%94%A8%E8%A1%A8%E8%BE%BE%E5%BC%8F)
+    - [11、IOC 容器中 Bean 的生命周期方法](#11ioc-%E5%AE%B9%E5%99%A8%E4%B8%AD-bean-%E7%9A%84%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F%E6%96%B9%E6%B3%95)
+      - [（1）生命周期方法](#1%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F%E6%96%B9%E6%B3%95)
+      - [（2）创建 Bean 后置处理器](#2%E5%88%9B%E5%BB%BA-bean-%E5%90%8E%E7%BD%AE%E5%A4%84%E7%90%86%E5%99%A8)
+    - [12、通过调用工厂方法创建 Bean](#12%E9%80%9A%E8%BF%87%E8%B0%83%E7%94%A8%E5%B7%A5%E5%8E%82%E6%96%B9%E6%B3%95%E5%88%9B%E5%BB%BA-bean)
+      - [（1）调用静态工厂方法创建 Bean](#1%E8%B0%83%E7%94%A8%E9%9D%99%E6%80%81%E5%B7%A5%E5%8E%82%E6%96%B9%E6%B3%95%E5%88%9B%E5%BB%BA-bean)
+      - [（2）调用实例工厂方法创建 Bean](#2%E8%B0%83%E7%94%A8%E5%AE%9E%E4%BE%8B%E5%B7%A5%E5%8E%82%E6%96%B9%E6%B3%95%E5%88%9B%E5%BB%BA-bean)
+      - [（3）FactoryBean](#3factorybean)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -1634,3 +1641,238 @@ destroy ....
 * 将 Bean 实例传递给 Bean 后置处理器的 postProcessAfterInitialization方法
 * Bean 可以使用了
 * 当容器关闭时, 调用 Bean 的销毁方法
+
+### 12、通过调用工厂方法创建 Bean
+
+#### （1）调用静态工厂方法创建 Bean
+
+调用静态工厂方法创建 Bean是将对象创建的过程封装到静态方法中. 当客户端需要对象时, 只需要简单地调用静态方法, 而不同关心创建对象的细节。要声明通过静态方法创建的 Bean, 需要在 Bean 的 class 属性里指定拥有该工厂的方法的类, 同时在 factory-method 属性里指定工厂方法的名称。最后, 使用 <constrctor-arg> 元素为该方法传递方法参数。
+
+在com.jack.spring下创建一个包factory，创建两个类Car和StaticCarFactory：
+
+```java
+public class Car {
+
+    private String brand;
+    private double price;
+
+    public Car(String brand, double price) {
+        this.brand = brand;
+        this.price = price;
+    }
+
+    public String getBrand() {
+        return brand;
+    }
+
+    public void setBrand(String brand) {
+        this.brand = brand;
+    }
+
+    public double getPrice() {
+        return price;
+    }
+
+    public void setPrice(double price) {
+        this.price = price;
+    }
+
+    @Override
+    public String toString() {
+        return "Car{" +
+                "brand='" + brand + '\'' +
+                ", price=" + price +
+                '}';
+    }
+}
+```
+
+```java
+public class StaticCarFactory {
+
+    private static Map<String, Car> cars = new HashMap<>();
+
+    static {
+        cars.put("audi", new Car("audi", 30000));
+        cars.put("ford", new Car("ford", 40000));
+    }
+
+    // 静态工厂方法
+    public static Car getCar(String name){
+        return cars.get(name);
+    }
+}
+```
+
+创建spring配置文件benas-factory.xml：
+
+```xml
+    <bean id="car1" class="com.jack.spring.factory.StaticCarFactory" factory-method="getCar">
+        <constructor-arg value="audi"></constructor-arg>
+    </bean>
+```
+
+创建测试类：
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        ApplicationContext ctx = new ClassPathXmlApplicationContext("beans-factory.xml");
+        Car car = (Car)ctx.getBean("car1");
+        System.out.println(car);
+    }
+}
+```
+
+运行结果如下：
+
+```
+Car{brand='audi', price=30000.0}
+```
+
+#### （2）调用实例工厂方法创建 Bean
+
+实例工厂方法: 将对象的创建过程封装到另外一个对象实例的方法里. 当客户端需要请求对象时, 只需要简单的调用该实例方法而不需要关心对象的创建细节。要声明通过实例工厂方法创建的 Bean：
+
+* 在 bean 的 factory-bean 属性里指定拥有该工厂方法的 Bean
+* 在 factory-method 属性里指定该工厂方法的名称
+* 使用 construtor-arg 元素为工厂方法传递方法参数
+
+在factory包下创建一个类 InstanceCarFactory：
+
+```java
+public class InstanceCarFactory {
+
+    private Map<String, Car> cars = null;
+
+    public InstanceCarFactory(){
+        cars = new HashMap<>();
+        cars.put("audi", new Car("audi", 30000));
+        cars.put("ford", new Car("ford", 40000));
+    }
+
+    public Car getCar(String name){
+        return cars.get(name);
+    }
+}
+```
+
+在beans-factory.xml中添加：
+
+```xml
+    <bean id="carFactory" class="com.jack.spring.factory.InstanceCarFactory"></bean>
+
+    <bean id="car2" factory-bean="carFactory" factory-method="getCar">
+        <constructor-arg value="ford"></constructor-arg>
+    </bean>
+```
+
+修改main测试方法：
+
+```java
+ApplicationContext ctx = new ClassPathXmlApplicationContext("beans-factory.xml");
+Car car = (Car)ctx.getBean("car2");
+System.out.println(car);
+```
+
+测试结果如下：
+
+```
+Car{brand='ford', price=40000.0}
+```
+
+#### （3）FactoryBean
+
+Spring 中有两种类型的 Bean, 一种是普通Bean, 另一种是工厂Bean, 即FactoryBean。工厂 Bean 跟普通Bean不同, 其返回的对象不是指定类的一个实例, 其返回的是该工厂 Bean 的 getObject 方法所返回的对象。
+
+在com.jack.spring创建一个factoryBean包，添加两个类：
+
+```java
+public class Car {
+
+    private String brand;
+    private double price;
+
+    public Car(String brand, double price) {
+        this.brand = brand;
+        this.price = price;
+    }
+
+    public String getBrand() {
+        return brand;
+    }
+
+    public void setBrand(String brand) {
+        this.brand = brand;
+    }
+
+    public double getPrice() {
+        return price;
+    }
+
+    public void setPrice(double price) {
+        this.price = price;
+    }
+
+    @Override
+    public String toString() {
+        return "Car{" +
+                "brand='" + brand + '\'' +
+                ", price=" + price +
+                '}';
+    }
+}
+```
+
+```java
+public class CarFactoryBean implements FactoryBean<Car> {
+
+    private String brand;
+
+    public void setBrand(String brand) {
+        this.brand = brand;
+    }
+
+    @Override
+    public Car getObject() throws Exception {
+        return new Car(brand, 30000);
+    }
+
+    @Override
+    public Class<?> getObjectType() {
+        return Car.class;
+    }
+
+    @Override
+    public boolean isSingleton() {
+        return true;
+    }
+}
+```
+
+创建spring配置文件beans-beanfactory.xml：
+
+```xml
+    <bean id="car" class="com.jack.spring.factoryBean.CarFactoryBean">
+        <property name="brand" value="BWM"></property>
+    </bean>
+```
+
+创建Main测试类：
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        ApplicationContext ctx = new ClassPathXmlApplicationContext("beans-beanfactory.xml");
+        Car car = (Car)ctx.getBean("car");
+        System.out.println(car);
+    }
+}
+```
+
+测试结果如下：
+
+```
+Car{brand='BWM', price=30000.0}
+```
+
