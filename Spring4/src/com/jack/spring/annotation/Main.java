@@ -10,16 +10,19 @@ public class Main {
     public static void main(String[] args) {
         ApplicationContext ctx = new ClassPathXmlApplicationContext("beans-annotation.xml");
 
-        TestObject obj = (TestObject)ctx.getBean("testObjects");
-        System.out.println(obj);
+//        TestObject obj = (TestObject)ctx.getBean("testObjects");
+//        System.out.println(obj);
+
+//        UserController userController = (UserController)ctx.getBean("userController");
+//        System.out.println(userController);
+
+//        UserService userService = (UserService)ctx.getBean("userService");
+//        System.out.println(userService);
+//
+//        UserRepositoryImpl userRepositoryImpl = (UserRepositoryImpl)ctx.getBean("userRepositoryImpl");
+//        System.out.println(userRepositoryImpl);
 
         UserController userController = (UserController)ctx.getBean("userController");
-        System.out.println(userController);
-
-        UserService userService = (UserService)ctx.getBean("userService");
-        System.out.println(userService);
-
-        UserRepositoryImpl userRepositoryImpl = (UserRepositoryImpl)ctx.getBean("userRepositoryImpl");
-        System.out.println(userRepositoryImpl);
+        userController.execute();
     }
 }

@@ -4,7 +4,7 @@
        xmlns:context="http://www.springframework.org/schema/context"
        xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context https://www.springframework.org/schema/context/spring-context.xsd">
 
-    <!--<context:component-scan base-package="com.jack.spring.annotation"></context:component-scan>-->
+    <context:component-scan base-package="com.jack.spring.annotation"></context:component-scan>
     <!--<context:component-scan base-package="com.jack.spring.annotation" resource-pattern="repository/*.class"></context:component-scan>-->
     <!--<context:component-scan base-package="com.jack.spring.annotation" >-->
         <!--<context:exclude-filter type="annotation" expression="org.springframework.stereotype.Repository"></context:exclude-filter>-->
@@ -15,7 +15,7 @@
     <!--<context:component-scan base-package="com.jack.spring.annotation">-->
         <!--<context:exclude-filter type="assignable" expression="com.jack.spring.annotation.repository.UserRepository"></context:exclude-filter>-->
     <!--</context:component-scan>-->
-    <context:component-scan base-package="com.jack.spring.annotation" use-default-filters="false">
-        <context:include-filter type="assignable" expression="com.jack.spring.annotation.repository.UserRepository"></context:include-filter>
-    </context:component-scan>
+    <!--<context:component-scan base-package="com.jack.spring.annotation" use-default-filters="false">-->
+        <!--<context:include-filter type="assignable" expression="com.jack.spring.annotation.repository.UserRepository"></context:include-filter>-->
+    <!--</context:component-scan>-->
 </beans>

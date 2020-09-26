@@ -2,12 +2,11 @@ package com.jack.spring.annotation.repository;
 
 import org.springframework.stereotype.Repository;
 
-//@Repository("userRepository")
 @Repository
-public class UserRepositoryImpl implements UserRepository {
+public class UserJdbcRepository implements UserRepository{
 
     @Override
     public void save() {
-        System.out.println("UserRepositoryImpl save ...");
+        System.out.println("UserJdbcRepository save...");
     }
 }

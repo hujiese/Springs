@@ -43,6 +43,7 @@
     - [（1）组件扫描](#1%E7%BB%84%E4%BB%B6%E6%89%AB%E6%8F%8F)
     - [（2）使用resource-pattern 属性过滤特定的类](#2%E4%BD%BF%E7%94%A8resource-pattern-%E5%B1%9E%E6%80%A7%E8%BF%87%E6%BB%A4%E7%89%B9%E5%AE%9A%E7%9A%84%E7%B1%BB)
     - [（3）include-filter 和 exclude-filter](#3include-filter-%E5%92%8C-exclude-filter)
+    - [2、自动装配](#2%E8%87%AA%E5%8A%A8%E8%A3%85%E9%85%8D)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -2122,6 +2123,100 @@ Exception in thread "main" org.springframework.beans.factory.NoSuchBeanDefinitio
 	at com.jack.spring.annotation.Main.main(Main.java:13)
 ```
 
+### 2、自动装配
 
+\<context:component-scan> 元素还会自动注册 AutowiredAnnotationBeanPostProcessor 实例，该实例可以自动装配具有 @Autowired 和 @Resource 、@Inject注解的属性。
 
- 
+@Autowired 注解自动装配具有兼容类型的单个 Bean属性
+
+* 构造器，普通字段(即使是非 public)，一切具有参数的方法都可以应用@Authwired 注解。
+* 默认情况下, 所有使用 @Authwired 注解的属性都需要被设置。当 Spring 找不到匹配的 Bean 装配属性时，会抛出异常，若某一属性允许不被设置，可以设置 @Authwired 注解的 required 属性为 false。
+* 默认情况下，当 IOC 容器里存在多个类型兼容的 Bean 时，通过类型的自动装配将无法工作。此时可以在 @Qualifier 注解里提供 Bean 的名称。Spring 允许对方法的入参标注 @Qualifiter 已指定注入 Bean 的名称。
+* @Authwired 注解也可以应用在数组类型的属性上，此时 Spring 将会把所有匹配的 Bean 进行自动装配。
+* @Authwired 注解也可以应用在集合属性上，此时 Spring 读取该集合的类型信息，然后自动装配所有与之兼容的 Bean。
+* @Authwired 注解用在 java.util.Map 上时，若该 Map 的键值为 String，那么 Spring 将自动装配与之 Map 值类型兼容的 Bean，此时 Bean 的名称作为键值。
+
+ 修改annotation包下代码：
+
+```java
+@Controller
+public class UserController {
+
+    @Autowired
+    private UserService userService;
+
+    public void execute(){
+        System.out.println("UserController execute ...");
+        userService.add();
+    }
+}
+```
+
+```java
+@Service
+public class UserService {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    public void add(){
+        System.out.println("UserService add ...");
+        userRepository.save();
+    }
+}
+```
+
+修改Main测试方法：
+
+```java
+ApplicationContext ctx = new ClassPathXmlApplicationContext("beans-annotation.xml");      
+UserController userController = (UserController)ctx.getBean("userController");
+userController.execute();
+```
+
+效果如下：
+
+```
+UserController execute ...
+UserService add ...
+UserRepositoryImpl save ...
+```
+
+在UserService类中自动装配了实现UserRepository接口的类，现在repository目录下只有一个UserRepositoryImpl类实现了UserRepository接口，所以没有什么问题，但是如果有多个实现接口的类，那就会出错。
+
+在repository下创建一个新的类：
+
+```java
+@Repository
+public class UserJdbcRepository implements UserRepository{
+
+    @Override
+    public void save() {
+        System.out.println("UserJdbcRepository save...");
+    }
+}
+```
+
+重新运行测试方法将会报错。下面有两种方法来解决这个问题。
+
+* **方法一** 
+
+可以在@Repository中指定一个bean名称，IOC容器将会进行匹配：
+
+```java
+@Repository("userRepository")
+//@Repository
+public class UserRepositoryImpl implements UserRepository {
+    ...
+```
+
+* **方法二**
+
+可以在UserService中自动装配时使用 **@Qualifier** 标签指定某个特定的实现类：
+
+```java
+@Autowired
+@Qualifier("userRepositoryImpl")
+private UserRepository userRepository;
+```
+
