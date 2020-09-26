@@ -44,6 +44,7 @@
     - [（2）使用resource-pattern 属性过滤特定的类](#2%E4%BD%BF%E7%94%A8resource-pattern-%E5%B1%9E%E6%80%A7%E8%BF%87%E6%BB%A4%E7%89%B9%E5%AE%9A%E7%9A%84%E7%B1%BB)
     - [（3）include-filter 和 exclude-filter](#3include-filter-%E5%92%8C-exclude-filter)
     - [2、自动装配](#2%E8%87%AA%E5%8A%A8%E8%A3%85%E9%85%8D)
+  - [三、泛型依赖注入](#%E4%B8%89%E6%B3%9B%E5%9E%8B%E4%BE%9D%E8%B5%96%E6%B3%A8%E5%85%A5)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -2220,3 +2221,81 @@ public class UserRepositoryImpl implements UserRepository {
 private UserRepository userRepository;
 ```
 
+Spring 还支持 **@Resource** 和 **@Inject** 注解，这两个注解和 @Autowired 注解的功用类似：
+
+* @Resource 注解要求提供一个 Bean 名称的属性，若该属性为空，则自动采用标注处的变量或方法名作为 Bean 的名称
+* @Inject 和 @Autowired 注解一样也是按类型匹配注入的 Bean， 但没有 reqired 属性
+
+**建议使用 @Autowired 注解**
+
+## 三、泛型依赖注入
+
+Spring 4.x 中可以为子类注入子类对应的泛型类型的成员变量的引用：
+
+<img src="./img/di.png" style="zoom:80%;" />
+
+在com.jack.spring下新建generic.di包，创建下面几个类：
+
+```java
+public class User {
+}
+```
+
+```java
+public class BaseRepository<T> {
+}
+```
+
+```java
+@Repository
+public class UserRepository extends BaseRepository<User> {
+}
+```
+
+```java
+public class BaseService<T> {
+
+    @Autowired
+    protected BaseRepository<T> repository;
+
+    public void add(){
+        System.out.println("add ...");
+        System.out.println(repository);
+    }
+}
+```
+
+```java
+@Service
+public class UserService extends BaseService<User> {
+}
+```
+
+编写Main测试类：
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        ApplicationContext ctx = new ClassPathXmlApplicationContext("beans-generic-di.xml");
+
+        UserService userService = (UserService)ctx.getBean("userService");
+
+        userService.add();
+    }
+}
+```
+
+编写spring配置文件beans-generic-di.xml：
+
+```xml
+<context:component-scan base-package="com.jack.spring.generic.di"></context:component-scan>
+```
+
+测试结果如下：
+
+```
+add ...
+com.jack.spring.generic.di.UserRepository@473b46c3
+```
+
+泛型关系在父类中就建立好了，子类直接指定类型，完成注入。
