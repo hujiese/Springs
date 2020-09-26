@@ -38,6 +38,11 @@
       - [（1）调用静态工厂方法创建 Bean](#1%E8%B0%83%E7%94%A8%E9%9D%99%E6%80%81%E5%B7%A5%E5%8E%82%E6%96%B9%E6%B3%95%E5%88%9B%E5%BB%BA-bean)
       - [（2）调用实例工厂方法创建 Bean](#2%E8%B0%83%E7%94%A8%E5%AE%9E%E4%BE%8B%E5%B7%A5%E5%8E%82%E6%96%B9%E6%B3%95%E5%88%9B%E5%BB%BA-bean)
       - [（3）FactoryBean](#3factorybean)
+  - [二、注解开发](#%E4%BA%8C%E6%B3%A8%E8%A7%A3%E5%BC%80%E5%8F%91)
+    - [1、在 classpath 中扫描组件](#1%E5%9C%A8-classpath-%E4%B8%AD%E6%89%AB%E6%8F%8F%E7%BB%84%E4%BB%B6)
+    - [（1）组件扫描](#1%E7%BB%84%E4%BB%B6%E6%89%AB%E6%8F%8F)
+    - [（2）使用resource-pattern 属性过滤特定的类](#2%E4%BD%BF%E7%94%A8resource-pattern-%E5%B1%9E%E6%80%A7%E8%BF%87%E6%BB%A4%E7%89%B9%E5%AE%9A%E7%9A%84%E7%B1%BB)
+    - [（3）include-filter 和 exclude-filter](#3include-filter-%E5%92%8C-exclude-filter)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -1876,3 +1881,247 @@ public class Main {
 Car{brand='BWM', price=30000.0}
 ```
 
+## 二、注解开发
+
+### 1、在 classpath 中扫描组件
+
+组件扫描(component scanning):  Spring 能够从 classpath 下自动扫描, 侦测和实例化具有特定注解的组件。
+
+特定组件包括：
+
+* **@Component**: 基本注解, 标识了一个受 Spring 管理的组件
+* **@Respository**: 标识持久层组件
+* **@Service**: 标识服务层(业务层)组件
+* **@Controller**: 标识表现层组件
+
+**对于扫描到的组件，Spring 有默认的命名策略：使用非限定类名, 第一个字母小写。也可以在注解中通过 value 属性值标识组件的名称。**
+
+当在组件类上使用了特定的注解之后, 还需要在 Spring 的配置文件中声明 \<context:component-scan> ：
+
+* base-package 属性指定一个需要扫描的基类包，Spring 容器将会扫描这个基类包里及其子包中的所有类。
+* 当需要扫描多个包时, 可以使用逗号分隔。
+
+### （1）组件扫描
+
+在com.jack.spring目录下创建该目录结构：
+
+![](./img/annoc.png)
+
+创建的类如下所示：
+
+```java
+@Controller
+public class UserController {
+
+    public void execute(){
+        System.out.println("UserController execute ...");
+    }
+}
+```
+
+```java
+public interface UserRepository {
+    public void save();
+}
+```
+
+```java
+@Repository
+public class UserRepositoryImpl implements UserRepository {
+
+    @Override
+    public void save() {
+        System.out.println("UserRepositoryImpl save ...");
+    }
+}
+```
+
+```java
+@Service
+public class UserService {
+
+    public void add(){
+        System.out.println("UserService add ...");
+    }
+}
+```
+
+```java
+@Component("testObjects")
+public class TestObject {
+}
+```
+
+测试类：
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        ApplicationContext ctx = new ClassPathXmlApplicationContext("beans-annotation.xml");
+
+        TestObject obj = (TestObject)ctx.getBean("testObjects");
+        System.out.println(obj);
+
+        UserController userController = (UserController)ctx.getBean("userController");
+        System.out.println(userController);
+
+        UserService userService = (UserService)ctx.getBean("userService");
+        System.out.println(userService);
+
+        UserRepositoryImpl userRepositoryImpl = (UserRepositoryImpl)ctx.getBean("userRepositoryImpl");
+        System.out.println(userRepositoryImpl);
+    }
+}
+```
+
+此时还不能进行测试，新建一个beans-annotation.xml，添加：
+
+```xml
+<context:component-scan base-package="com.jack.spring.annotation"></context:component-scan>
+```
+
+spring的IOC容器会自动扫描 com.jack.spring.annotation 包下有Spring注解标记的类。
+
+测试结果如下：
+
+```
+com.jack.spring.annotation.TestObject@31206beb
+com.jack.spring.annotation.controller.UserController@3e77a1ed
+com.jack.spring.annotation.service.UserService@3ffcd140
+com.jack.spring.annotation.repository.UserRepositoryImpl@23bb8443
+```
+
+这几个类都在IOC容器中。
+
+### （2）使用resource-pattern 属性过滤特定的类
+
+如果仅希望扫描特定的类而非基包下的所有类，可**使用 resource-pattern 属性过滤特定的类**。
+
+修改beans-annotation.xml文件：
+
+```xml
+<context:component-scan base-package="com.jack.spring.annotation" resource-pattern="repository/*.class"></context:component-scan>
+```
+
+指定只扫描 autowire 包下的类，运行结果如下：
+
+```java
+Exception in thread "main" org.springframework.beans.factory.NoSuchBeanDefinitionException: No bean named 'testObjects' available
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.getBeanDefinition(DefaultListableBeanFactory.java:805)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getMergedLocalBeanDefinition(AbstractBeanFactory.java:1278)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:297)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:202)
+	at org.springframework.context.support.AbstractApplicationContext.getBean(AbstractApplicationContext.java:1108)
+	at com.jack.spring.annotation.Main.main(Main.java:13)
+```
+
+非repository下的类无法被扫描到。
+
+### （3）include-filter 和 exclude-filter
+
+* \<context:include-filter> 子节点表示要包含的目标类
+* \<context:exclude-filter> 子节点表示要排除在外的目标类
+* \<context:component-scan> 下可以拥有若干个 \<context:include-filter> 和 \<context:exclude-filter> 子节点
+* \<context:include-filter> 和 \<context:exclude-filter> 子节点支持多种类型的过滤表达式：
+
+<img src="./img/in_exclude_filter.png" style="zoom:80%;" />
+
+修改beans-annotation.xml：
+
+```xml
+    <context:component-scan base-package="com.jack.spring.annotation" >
+        <context:exclude-filter type="annotation" expression="org.springframework.stereotype.Repository"></context:exclude-filter>
+    </context:component-scan>
+```
+
+测试结果如下：
+
+```java
+com.jack.spring.annotation.TestObject@71a794e5
+com.jack.spring.annotation.controller.UserController@76329302
+com.jack.spring.annotation.service.UserService@5e25a92e
+Exception in thread "main" org.springframework.beans.factory.NoSuchBeanDefinitionException: No bean named 'userRepositoryImpl' available
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.getBeanDefinition(DefaultListableBeanFactory.java:805)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getMergedLocalBeanDefinition(AbstractBeanFactory.java:1278)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:297)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:202)
+	at org.springframework.context.support.AbstractApplicationContext.getBean(AbstractApplicationContext.java:1108)
+	at com.jack.spring.annotation.Main.main(Main.java:22)
+```
+
+标记有**@Repository**的类都被排除了，但其他类还是可以被扫描。
+
+**接下来演示include-filter的效果**。
+
+修改配置xml文件如下：
+
+```xml
+    <context:component-scan base-package="com.jack.spring.annotation" use-default-filters="false">
+        <context:include-filter type="annotation" expression="org.springframework.stereotype.Repository"></context:include-filter>
+    </context:component-scan>
+```
+
+这里设置use-default-filters为false，默认情况下这个值是true，现在设置为false是为了演示 include-filter 作用，现在的配置中只扫描标记有**@Repository**的类，其他的类都不包含。
+
+效果如下：
+
+```java
+Exception in thread "main" org.springframework.beans.factory.NoSuchBeanDefinitionException: No bean named 'testObjects' available
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.getBeanDefinition(DefaultListableBeanFactory.java:805)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getMergedLocalBeanDefinition(AbstractBeanFactory.java:1278)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:297)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:202)
+	at org.springframework.context.support.AbstractApplicationContext.getBean(AbstractApplicationContext.java:1108)
+	at com.jack.spring.annotation.Main.main(Main.java:13)
+```
+
+接下来演示 **assinable的作用**。
+
+修改配置xml文件：
+
+```xml
+    <context:component-scan base-package="com.jack.spring.annotation">
+        <context:exclude-filter type="assignable" expression="com.jack.spring.annotation.repository.UserRepository"></context:exclude-filter>
+    </context:component-scan>
+```
+
+这里过滤掉 com.jack.spring.annotation.repository.UserRepository 接口及其实现类，效果如下：
+
+```java
+com.jack.spring.annotation.TestObject@5e25a92e
+com.jack.spring.annotation.controller.UserController@4df828d7
+com.jack.spring.annotation.service.UserService@b59d31
+Exception in thread "main" org.springframework.beans.factory.NoSuchBeanDefinitionException: No bean named 'userRepositoryImpl' available
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.getBeanDefinition(DefaultListableBeanFactory.java:805)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getMergedLocalBeanDefinition(AbstractBeanFactory.java:1278)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:297)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:202)
+	at org.springframework.context.support.AbstractApplicationContext.getBean(AbstractApplicationContext.java:1108)
+	at com.jack.spring.annotation.Main.main(Main.java:22)
+```
+
+继续修改xml文件：
+
+```xml
+    <context:component-scan base-package="com.jack.spring.annotation" use-default-filters="false">
+        <context:include-filter type="assignable" expression="com.jack.spring.annotation.repository.UserRepository"></context:include-filter>
+    </context:component-scan>
+```
+
+这里只包含 com.jack.spring.annotation.repository.UserRepository 及其实现类，其他类都被过滤掉。
+
+效果如下：
+
+```java
+Exception in thread "main" org.springframework.beans.factory.NoSuchBeanDefinitionException: No bean named 'testObjects' available
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.getBeanDefinition(DefaultListableBeanFactory.java:805)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getMergedLocalBeanDefinition(AbstractBeanFactory.java:1278)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:297)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:202)
+	at org.springframework.context.support.AbstractApplicationContext.getBean(AbstractApplicationContext.java:1108)
+	at com.jack.spring.annotation.Main.main(Main.java:13)
+```
+
+
+
+ 
