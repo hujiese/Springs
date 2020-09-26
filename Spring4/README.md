@@ -45,6 +45,9 @@
     - [（3）include-filter 和 exclude-filter](#3include-filter-%E5%92%8C-exclude-filter)
     - [2、自动装配](#2%E8%87%AA%E5%8A%A8%E8%A3%85%E9%85%8D)
   - [三、泛型依赖注入](#%E4%B8%89%E6%B3%9B%E5%9E%8B%E4%BE%9D%E8%B5%96%E6%B3%A8%E5%85%A5)
+  - [四、AOP](#%E5%9B%9Baop)
+    - [1、背景抛出](#1%E8%83%8C%E6%99%AF%E6%8A%9B%E5%87%BA)
+    - [2、动态代理](#2%E5%8A%A8%E6%80%81%E4%BB%A3%E7%90%86)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -2299,3 +2302,211 @@ com.jack.spring.generic.di.UserRepository@473b46c3
 ```
 
 泛型关系在父类中就建立好了，子类直接指定类型，完成注入。
+
+## 四、AOP
+
+新建一个spring工程，取名为spring-2，创建com.jack.spring.helloaop包。
+
+### 1、背景抛出
+
+有一个计算器的接口及其实现类：
+
+![](./img/calc.png)
+
+现在要求：
+
+* 日志：在程序执行期间追踪正在发生的活动
+* 验证：希望计算器只能处理正数的运算
+
+于是在 com.jack.spring.helloaop 包下创建：
+
+```java
+public interface ArithmeticCalculator {
+
+	int add(int i, int j);
+	int sub(int i, int j);
+	
+	int mul(int i, int j);
+	int div(int i, int j);
+	
+}
+```
+
+```java
+public class ArithmeticCalculatorImpl implements ArithmeticCalculator {
+
+	@Override
+	public int add(int i, int j) {
+		int result = i + j;
+		return result;
+	}
+
+	@Override
+	public int sub(int i, int j) {
+		int result = i - j;
+		return result;
+	}
+
+	@Override
+	public int mul(int i, int j) {
+		int result = i * j;
+		return result;
+	}
+
+	@Override
+	public int div(int i, int j) {
+		int result = i / j;
+		return result;
+	}
+
+}
+```
+
+现在如果要在四个方法前后输出日志，一般可以这样做：
+
+```java
+public class ArithmeticCalculatorLoggingImpl implements ArithmeticCalculator {
+
+	@Override
+	public int add(int i, int j) {
+		System.out.println("The method add begins with [" + i + "," + j + "]");
+		int result = i + j;
+		System.out.println("The method add ends with " + result);
+		return result;
+	}
+
+	@Override
+	public int sub(int i, int j) {
+		System.out.println("The method sub begins with [" + i + "," + j + "]");
+		int result = i - j;
+		System.out.println("The method sub ends with " + result);
+		return result;
+	}
+
+	@Override
+	public int mul(int i, int j) {
+		System.out.println("The method mul begins with [" + i + "," + j + "]");
+		int result = i * j;
+		System.out.println("The method mul ends with " + result);
+		return result;
+	}
+
+	@Override
+	public int div(int i, int j) {
+		System.out.println("The method div begins with [" + i + "," + j + "]");
+		int result = i / j;
+		System.out.println("The method div ends with " + result);
+		return result;
+	}
+
+}
+```
+
+这样做的确可行，但有以下几个问题：
+
+* **代码混乱**：越来越多的非业务需求(日志和验证等)加入后，原有的业务方法急剧膨胀。  每个方法在处理核心逻辑的同时还必须兼顾其他多个关注点。 
+* **代码分散**：以日志需求为例，只是为了满足这个单一需求，就不得不在多个模块（方法）里多次重复相同的日志代码。 如果日志需求发生变化，必须修改所有模块。
+
+### 2、动态代理
+
+代理设计模式的原理: 使用一个代理将对象包装起来，然后用该代理对象取代原始对象。 任何对原始对象的调用都要通过代理。 代理对象决定是否以及何时将方法调用转到原始对象上。
+
+添加一个动态代理类：
+
+```java
+public class ArithmeticCalculatorLoggingProxy {
+
+	//要代理的对象
+	private ArithmeticCalculator target;
+
+	public ArithmeticCalculatorLoggingProxy(ArithmeticCalculator target) {
+		super();
+		this.target = target;
+	}
+
+	//返回代理对象
+	public ArithmeticCalculator getLoggingProxy(){
+		ArithmeticCalculator proxy = null;
+
+		// 代理对象由哪一个类加载器负责加载
+		ClassLoader loader = target.getClass().getClassLoader();
+		// 代理对象的类型
+		Class [] interfaces = new Class[]{ArithmeticCalculator.class};
+		// 当具体调用代理对象的方法时，该执行的代码
+		InvocationHandler h = new InvocationHandler() {
+			/**
+			 * proxy: 代理对象。 一般不使用该对象
+			 * method: 正在被调用的方法
+			 * args: 调用方法传入的参数
+			 */
+			@Override
+			public Object invoke(Object proxy, Method method, Object[] args)
+					throws Throwable {
+				String methodName = method.getName();
+				//打印日志
+				System.out.println("[before] The method " + methodName + " begins with " + Arrays.asList(args));
+
+				//调用目标方法
+				Object result = null;
+
+				try {
+					//前置通知
+					result = method.invoke(target, args);
+					//返回通知, 可以访问到方法的返回值
+				} catch (NullPointerException e) {
+					e.printStackTrace();
+					//异常通知, 可以访问到方法出现的异常
+				}
+
+				//后置通知. 因为方法可以能会出异常, 所以访问不到方法的返回值
+
+				//打印日志
+				System.out.println("[after] The method ends with " + result);
+
+				return result;
+			}
+		};
+
+		/**
+		 * loader: 代理对象使用的类加载器。
+		 * interfaces: 指定代理对象的类型. 即代理代理对象中可以有哪些方法.
+		 * h: 当具体调用代理对象的方法时, 应该如何进行响应, 实际上就是调用 InvocationHandler 的 invoke 方法
+		 */
+		proxy = (ArithmeticCalculator) Proxy.newProxyInstance(loader, interfaces, h);
+
+		return proxy;
+	}
+}
+```
+
+创建测试类：
+
+```java
+public class Main {
+	
+	public static void main(String[] args) {
+		ArithmeticCalculator arithmeticCalculator = new ArithmeticCalculatorImpl();
+
+		arithmeticCalculator =
+				new ArithmeticCalculatorLoggingProxy(arithmeticCalculator).getLoggingProxy();
+
+		int result = arithmeticCalculator.add(11, 12);
+		System.out.println("result:" + result);
+
+		result = arithmeticCalculator.div(21, 3);
+		System.out.println("result:" + result);
+	}
+}
+```
+
+测试结果如下：
+
+```
+[before] The method add begins with [11, 12]
+[after] The method ends with 23
+result:23
+[before] The method div begins with [21, 3]
+[after] The method ends with 7
+result:7
+```
+
