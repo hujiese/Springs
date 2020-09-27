@@ -56,6 +56,8 @@
         - [C、返回通知](#c%E8%BF%94%E5%9B%9E%E9%80%9A%E7%9F%A5)
         - [D、异常通知](#d%E5%BC%82%E5%B8%B8%E9%80%9A%E7%9F%A5)
         - [E、环绕通知](#e%E7%8E%AF%E7%BB%95%E9%80%9A%E7%9F%A5)
+      - [（2）指定切面的优先级](#2%E6%8C%87%E5%AE%9A%E5%88%87%E9%9D%A2%E7%9A%84%E4%BC%98%E5%85%88%E7%BA%A7)
+      - [（3）重用切入点定义](#3%E9%87%8D%E7%94%A8%E5%88%87%E5%85%A5%E7%82%B9%E5%AE%9A%E4%B9%89)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -2936,4 +2938,194 @@ result:7
 ```
 
 **环绕通知的作用等价于动态代理。**
+
+#### （2）指定切面的优先级
+
+在同一个连接点上应用不止一个切面时， 除非明确指定，否则它们的优先级是不确定的。切面的优先级可以通过实现 Ordered 接口或利用 @Order 注解指定。
+
+实现 Ordered 接口，getOrder() 方法的返回值越小，优先级越高。使用 @Order 注解，序号出现在注解中。
+
+新建一个切面类：
+
+```java
+@Aspect
+@Component
+public class VlidationAspect {
+
+	@Before("execution(* com.jack.spring.impl.ArithmeticCalculator.*(int, int))")
+	public void validateArgs(JoinPoint joinPoint){
+		System.out.println("-->validate:" + Arrays.asList(joinPoint.getArgs()));
+	}
+}
+```
+
+运行测试方法，结果如下：
+
+```
+The method add begins with [11, 12]
+-->validate:[11, 12]
+The method add ends
+The method add ends with 23
+result:23
+The method div begins with [21, 3]
+-->validate:[21, 3]
+The method div ends
+The method div ends with 7
+result:7
+```
+
+现在有两个前置通知，一个验证，一个日志，从结果看日志于验证前执行，其实两个通知是不确定的。
+
+接下来使用@Order来指定优先级。修改代码：
+
+```java
+@Order(1)
+@Aspect
+@Component
+public class VlidationAspect {
+    ...
+```
+
+```java
+@Order(2)
+@Aspect
+@Component
+public class LoggingAspect {
+    ...
+```
+
+测试结果如下：
+
+```
+-->validate:[11, 12]
+The method add begins with [11, 12]
+The method add ends
+The method add ends with 23
+result:23
+-->validate:[21, 3]
+The method div begins with [21, 3]
+The method div ends
+The method div ends with 7
+result:7
+```
+
+#### （3）重用切入点定义
+
+在编写 AspectJ 切面时，可以直接在通知注解中书写切入点表达式，但同一个切点表达式可能会在多个通知中重复出现。
+
+在 AspectJ 切面中，可以通过 @Pointcut 注解将一个切入点声明成简单的方法。切入点的方法体通常是空的，因为将切入点定义与应用程序逻辑混在一起是不合理的。
+
+切入点方法的访问控制符同时也控制着这个切入点的可见性，如果切入点要在多个切面中共用，最好将它们集中在一个公共的类中，在这种情况下，它们必须被声明为 public。在引入这个切入点时，必须将类名也包括在内。如果类没有与这个切面放在同一个包中，还必须包含包名。其他通知可以通过方法名称引入该切入点。
+
+新建一个包 com.jack.spring.reuseCutPoint，将 com.jack.spring.impl 包下的所有内容复制到reuseCutPoint包下。
+
+修改 LoggingAspect ：
+
+```java
+//通过添加 @Aspect 注解声明一个 bean 是一个切面
+@Order(2)
+@Aspect
+@Component
+public class LoggingAspect {
+
+	/**
+	 * 定义一个方法, 用于声明切入点表达式. 一般地, 该方法中再不需要添入其他的代码.
+	 * 使用 @Pointcut 来声明切入点表达式.
+	 * 后面的其他通知直接使用方法名来引用当前的切入点表达式.
+	 */
+	@Pointcut("execution(public int com.jack.spring.reuseCutPoint.ArithmeticCalculator.*(int, int))")
+	public void declareJointPointExpression(){}
+
+	// 声明该方法是一个前置通知，在目标方法开始前执行
+	@Before("declareJointPointExpression()")
+	public void beforeMethod(JoinPoint joinPoint){
+		String methodName = joinPoint.getSignature().getName();
+		Object [] args = joinPoint.getArgs();
+
+		System.out.println("The method " + methodName + " begins with " + Arrays.asList(args));
+	}
+
+	// 后置通知，在目标方法执行后（无论是否发生异常）执行的通知
+	// 在后置通知中还不能访问目标方法执行的结果
+	@After("declareJointPointExpression()")
+	public void afterMethod(JoinPoint joinPoint){
+		String methodName = joinPoint.getSignature().getName();
+		System.out.println("The method " + methodName + " ends");
+	}
+
+	/**
+	 * 在方法法正常结束受执行的代码
+	 * 返回通知是可以访问到方法的返回值的
+	 */
+	@AfterReturning(value="declareJointPointExpression()",
+			returning="result")
+	public void afterReturning(JoinPoint joinPoint, Object result){
+		String methodName = joinPoint.getSignature().getName();
+		System.out.println("The method " + methodName + " ends with " + result);
+	}
+
+	/**
+	 * 在目标方法出现异常时会执行的代码.
+	 * 可以访问到异常对象; 且可以指定在出现特定异常时在执行通知代码
+	 */
+	@AfterThrowing(value="declareJointPointExpression()",
+			throwing="e")
+	public void afterThrowing(JoinPoint joinPoint, Exception e){
+		String methodName = joinPoint.getSignature().getName();
+		System.out.println("The method " + methodName + " occurs excetion:" + e);
+	}
+}
+```
+
+这里设置了切入点方法：
+
+```java
+@Pointcut("execution(public int com.jack.spring.reuseCutPoint.ArithmeticCalculator.*(int, int))")
+public void declareJointPointExpression(){}
+```
+
+其他的通知只需要引入该切点方法即可：
+
+```java
+@Before("declareJointPointExpression()")
+```
+
+修改 VlidationAspect ：
+
+```java
+@Order(1)
+@Aspect
+@Component
+public class VlidationAspect {
+
+	@Before("com.jack.spring.reuseCutPoint.LoggingAspect.declareJointPointExpression()")
+	public void validateArgs(JoinPoint joinPoint){
+		System.out.println("-->validate:" + Arrays.asList(joinPoint.getArgs()));
+	}
+}
+```
+
+使用完整的方法名引用该切点方法。
+
+修改spring配置文件applicationContext.xml：
+
+```xml
+<!--<context:component-scan base-package="com.jack.spring.impl"></context:component-scan>-->
+<context:component-scan base-package="com.jack.spring.reuseCutPoint"></context:component-scan>
+```
+
+测试结果如下：
+
+```
+-->validate:[11, 12]
+The method add begins with [11, 12]
+The method add ends
+The method add ends with 23
+result:23
+-->validate:[21, 3]
+The method div begins with [21, 3]
+The method div ends
+The method div ends with 7
+result:7
+```
 
