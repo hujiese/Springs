@@ -3129,3 +3129,176 @@ The method div ends with 7
 result:7
 ```
 
+（4）XML配置切面
+
+新建一个包 com.jack.spring.xml，添加下面几个类：
+
+```java
+public interface ArithmeticCalculator {
+
+	int add(int i, int j);
+	int sub(int i, int j);
+	
+	int mul(int i, int j);
+	int div(int i, int j);
+	
+}
+```
+
+```java
+public class ArithmeticCalculatorImpl implements ArithmeticCalculator {
+
+	@Override
+	public int add(int i, int j) {
+		int result = i + j;
+		return result;
+	}
+
+	@Override
+	public int sub(int i, int j) {
+		int result = i - j;
+		return result;
+	}
+
+	@Override
+	public int mul(int i, int j) {
+		int result = i * j;
+		return result;
+	}
+
+	@Override
+	public int div(int i, int j) {
+		int result = i / j;
+		return result;
+	}
+
+}
+```
+
+```java
+public class LoggingAspect {
+
+	public void beforeMethod(JoinPoint joinPoint){
+		String methodName = joinPoint.getSignature().getName();
+		Object [] args = joinPoint.getArgs();
+
+		System.out.println("The method " + methodName + " begins with " + Arrays.asList(args));
+	}
+
+	public void afterMethod(JoinPoint joinPoint){
+		String methodName = joinPoint.getSignature().getName();
+		System.out.println("The method " + methodName + " ends");
+	}
+
+	public void afterReturning(JoinPoint joinPoint, Object result){
+		String methodName = joinPoint.getSignature().getName();
+		System.out.println("The method " + methodName + " ends with " + result);
+	}
+
+	public void afterThrowing(JoinPoint joinPoint, Exception e){
+		String methodName = joinPoint.getSignature().getName();
+		System.out.println("The method " + methodName + " occurs excetion:" + e);
+	}
+
+//	public Object aroundMethod(ProceedingJoinPoint pjd){
+//
+//		Object result = null;
+//		String methodName = pjd.getSignature().getName();
+//
+//		try {
+//			//前置通知
+//			System.out.println("The method " + methodName + " begins with " + Arrays.asList(pjd.getArgs()));
+//			//执行目标方法
+//			result = pjd.proceed();
+//			//返回通知
+//			System.out.println("The method " + methodName + " ends with " + result);
+//		} catch (Throwable e) {
+//			//异常通知
+//			System.out.println("The method " + methodName + " occurs exception:" + e);
+//			throw new RuntimeException(e);
+//		}
+//		//后置通知
+//		System.out.println("The method " + methodName + " ends");
+//
+//		return result;
+//	}
+}
+```
+
+```java
+public class VlidationAspect {
+
+	public void validateArgs(JoinPoint joinPoint){
+		System.out.println("-->validate:" + Arrays.asList(joinPoint.getArgs()));
+	}
+}
+```
+
+添加配置文件applicationContext-xml.xml：
+
+```xml
+    <!-- 配置 bean -->
+    <bean id="arithmeticCalculator"
+          class="com.jack.spring.xml.ArithmeticCalculatorImpl"></bean>
+
+    <!-- 配置切面的 bean. -->
+    <bean id="loggingAspect"
+          class="com.jack.spring.xml.LoggingAspect"></bean>
+
+    <bean id="vlidationAspect"
+          class="com.jack.spring.xml.VlidationAspect"></bean>
+
+    <!-- 配置 AOP -->
+    <aop:config>
+        <!-- 配置切点表达式 -->
+        <aop:pointcut expression="execution(* com.jack.spring.xml.ArithmeticCalculator.*(int, int))"
+                      id="pointcut"/>
+        <!-- 配置切面及通知 -->
+        <aop:aspect ref="loggingAspect" order="2">
+            <aop:before method="beforeMethod" pointcut-ref="pointcut"/>
+            <aop:after method="afterMethod" pointcut-ref="pointcut"/>
+            <aop:after-throwing method="afterThrowing" pointcut-ref="pointcut" throwing="e"/>
+            <aop:after-returning method="afterReturning" pointcut-ref="pointcut" returning="result"/>
+            <!--
+            <aop:around method="aroundMethod" pointcut-ref="pointcut"/>
+            -->
+        </aop:aspect>
+        <aop:aspect ref="vlidationAspect" order="1">
+            <aop:before method="validateArgs" pointcut-ref="pointcut"/>
+        </aop:aspect>
+    </aop:config>
+```
+
+添加测试类：
+
+```java
+public class Main {
+	
+	public static void main(String[] args) {
+		ApplicationContext ctx = new ClassPathXmlApplicationContext("applicationContext-xml.xml");
+		ArithmeticCalculator arithmeticCalculator = ctx.getBean(ArithmeticCalculator.class);
+
+		int result = arithmeticCalculator.add(11, 12);
+		System.out.println("result:" + result);
+
+		result = arithmeticCalculator.div(21, 3);
+		System.out.println("result:" + result);
+	}
+}
+```
+
+测试结果如下：
+
+```
+-->validate:[11, 12]
+The method add begins with [11, 12]
+The method add ends
+The method add ends with 23
+result:23
+-->validate:[21, 3]
+The method div begins with [21, 3]
+The method div ends
+The method div ends with 7
+result:7
+```
+
