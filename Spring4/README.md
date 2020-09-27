@@ -48,6 +48,11 @@
   - [四、AOP](#%E5%9B%9Baop)
     - [1、背景抛出](#1%E8%83%8C%E6%99%AF%E6%8A%9B%E5%87%BA)
     - [2、动态代理](#2%E5%8A%A8%E6%80%81%E4%BB%A3%E7%90%86)
+    - [3、AOP](#3aop)
+    - [4、AspectJ](#4aspectj)
+      - [（1）AspectJ 注解声明切面](#1aspectj-%E6%B3%A8%E8%A7%A3%E5%A3%B0%E6%98%8E%E5%88%87%E9%9D%A2)
+        - [A、前置通知](#a%E5%89%8D%E7%BD%AE%E9%80%9A%E7%9F%A5)
+        - [B、后置通知](#b%E5%90%8E%E7%BD%AE%E9%80%9A%E7%9F%A5)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -2411,6 +2416,8 @@ public class ArithmeticCalculatorLoggingImpl implements ArithmeticCalculator {
 
 代理设计模式的原理: 使用一个代理将对象包装起来，然后用该代理对象取代原始对象。 任何对原始对象的调用都要通过代理。 代理对象决定是否以及何时将方法调用转到原始对象上。
 
+<img src="./img/proxy.png" style="zoom: 67%;" />
+
 添加一个动态代理类：
 
 ```java
@@ -2507,6 +2514,219 @@ public class Main {
 result:23
 [before] The method div begins with [21, 3]
 [after] The method ends with 7
+result:7
+```
+
+### 3、AOP
+
+AOP(Aspect-Oriented Programming，面向切面编程): 是一种新的方法论，是对传统 OOP(Object-Oriented Programming，面向对象编程) 的补充。AOP 的主要编程对象是切面(aspect)，而切面模块化横切关注点。
+
+在应用 AOP 编程时，仍然需要定义公共功能，但可以明确的定义这个功能在哪里，以什么方式应用，并且不必修改受影响的类。这样一来横切关注点就被模块化到特殊的对象(切面)里。
+
+**AOP 的好处**：
+
+* 每个事物逻辑位于一个位置，代码不分散，便于维护和升级
+* 业务模块更简洁，只包含核心业务代码
+
+<img src="./img/aop.png" style="zoom: 67%;" />
+
+**AOP的相关概念**如下：
+
+* **切面(Aspect)**：横切关注点(跨越应用程序多个模块的功能)被模块化的特殊对象。
+* **通知(Advice)**：切面必须要完成的工作。
+* **目标(Target)**：被通知的对象。
+* **代理(Proxy)**：向目标对象应用通知之后创建的对象。
+* **连接点（Joinpoint）**：程序执行的某个特定位置：如类某个方法调用前、调用后、方法抛出异常后等。连接点由两个信息确定：方法表示的程序执行点；相对点表示的方位。例如 ArithmethicCalculator#add() 方法执行前的连接点，执行点为 ArithmethicCalculator#add()； 方位为该方法执行前的位置。
+* **切点（pointcut）**：每个类都拥有多个连接点：例如 ArithmethicCalculator 的所有方法实际上都是连接点，即连接点是程序类中客观存在的事务。AOP 通过切点定位到特定的连接点。类比：连接点相当于数据库中的记录，切点相当于查询条件。切点和连接点不是一对一的关系，一个切点匹配多个连接点，切点通过 org.springframework.aop.Pointcut 接口进行描述，它使用类和方法作为连接点的查询条件。
+
+### 4、AspectJ
+
+AspectJ 是 Java 社区里最完整最流行的 AOP 框架，在 Spring2。0 以上版本中，可以使用基于 AspectJ 注解或基于 XML 配置的 AOP。
+
+要在 Spring 应用中使用 AspectJ 注解，必须在 classpath 下包含 AspectJ 类库：aopalliance.jar、aspectj.weaver.jar 和 spring-aspects.jar。还需要将 aop Schema 添加到 <beans> 根元素中。
+
+要在 Spring IOC 容器中启用 AspectJ 注解支持，只要在 Bean 配置文件中定义一个空的 XML 元素 \<aop:aspectj-autoproxy>，当 Spring IOC 容器侦测到 Bean 配置文件中的 \<aop:aspectj-autoproxy> 元素时，会自动为与 AspectJ 切面匹配的 Bean 创建代理。
+
+#### （1）AspectJ 注解声明切面
+
+要在 Spring 中声明 AspectJ 切面，只需要在 IOC 容器中将切面声明为 Bean 实例。 当在 Spring IOC 容器中初始化 AspectJ 切面之后，Spring IOC 容器就会为那些与 AspectJ 切面相匹配的 Bean 创建代理。在 AspectJ 注解中，切面只是一个带有 @Aspect 注解的 Java 类。 
+通知是标注有某种注解的简单的 Java 方法。
+
+AspectJ 支持 5 种类型的通知注解：
+* **@Before**：前置通知，在方法执行之前执行
+* **@After**：后置通知，在方法执行之后执行 
+* **@AfterRunning**：返回通知，在方法返回结果之后执行
+* **@AfterThrowing**：异常通知，在方法抛出异常之后
+* **@Around**：环绕通知，围绕着方法执行
+
+为了方便演示上面的五种注解，在com.jack.spring创建impl包，添加下面几个文件：
+
+```java
+public interface ArithmeticCalculator {
+
+	int add(int i, int j);
+	int sub(int i, int j);
+	
+	int mul(int i, int j);
+	int div(int i, int j);
+	
+}
+```
+
+```java
+@Component
+public class ArithmeticCalculatorImpl implements ArithmeticCalculator {
+
+	@Override
+	public int add(int i, int j) {
+		int result = i + j;
+		return result;
+	}
+
+	@Override
+	public int sub(int i, int j) {
+		int result = i - j;
+		return result;
+	}
+
+	@Override
+	public int mul(int i, int j) {
+		int result = i * j;
+		return result;
+	}
+
+	@Override
+	public int div(int i, int j) {
+		int result = i / j;
+		return result;
+	}
+
+}
+```
+
+添加Spring配置文件applicationContext.xml：
+
+```xml
+<context:component-scan base-package="com.jack.spring.impl"></context:component-scan>
+<!-- 使 AspectJ 的注解起作用 -->
+<aop:aspectj-autoproxy></aop:aspectj-autoproxy>
+```
+
+##### A、前置通知
+
+前置通知是在方法执行之前执行的通知，前置通知使用 @Before 注解,，并将切入点表达式的值作为注解值：
+
+<img src="./img/before.png" style="zoom:67%;" />
+
+其中，利用方法签名编写 AspectJ 切入点表达式。
+
+最典型的切入点表达式时根据方法的签名来匹配各种方法，例如：
+
+* **execution * com.atguigu.spring.ArithmeticCalculator.*(..)**：匹配 ArithmeticCalculator 中声明的所有方法,第一个 * 代表任意修饰符及任意返回值；第二个 * 代表任意方法. .. 匹配任意数量的参数，若目标类与接口与该切面在同一个包中，可以省略包名。
+* **execution public * ArithmeticCalculator.*(..)**：匹配 ArithmeticCalculator 接口的所有公有方法。
+* **execution public double ArithmeticCalculator.*(..)**：匹配 ArithmeticCalculator 中返回 double 类型数值的方法。
+* **execution public double ArithmeticCalculator.*(double, ..)**：匹配第一个参数为 double 类型的方法, .. 匹配任意数量任意类型的参数。
+* **execution public double ArithmeticCalculator.*(double, double)**： 匹配参数类型为 double, double 类型的方法。
+
+在 AspectJ 中，切入点表达式也可以通过操作符 &&、||、! 结合起来：
+
+<img src="./img/aspect.png" style="zoom:80%;" />
+
+可以在通知方法中声明一个类型为 JoinPoint 的参数，然后就能访问链接细节，如方法名称和参数值：
+
+<img src="./img/aspect1.png" style="zoom:80%;" />
+
+接下来创建一个切面类：
+
+```java
+//通过添加 @Aspect 注解声明一个 bean 是一个切面!
+@Aspect
+@Component
+public class LoggingAspect {
+
+	// 声明该方法是一个前置通知，在目标方法开始前执行
+	@Before("execution(public int com.jack.spring.impl.ArithmeticCalculator.*(int, int))")
+	public void beforeMethod(JoinPoint joinPoint){
+		String methodName = joinPoint.getSignature().getName();
+		Object [] args = joinPoint.getArgs();
+
+		System.out.println("The method " + methodName + " begins with " + Arrays.asList(args));
+	}
+
+}
+```
+
+添加前置通知方法 beforeMethod。
+
+编写测试类：
+
+```java
+public class Main {
+	
+	public static void main(String[] args) {
+		
+		ApplicationContext ctx = new ClassPathXmlApplicationContext("applicationContext.xml");
+		ArithmeticCalculator arithmeticCalculator = ctx.getBean(ArithmeticCalculator.class);
+
+		int result = arithmeticCalculator.add(11, 12);
+		System.out.println("result:" + result);
+
+		result = arithmeticCalculator.div(21, 3);
+		System.out.println("result:" + result);
+	}
+	
+}
+```
+
+测试结果如下：
+
+```
+The method add begins with [11, 12]
+result:23
+The method div begins with [21, 3]
+result:7
+```
+
+##### B、后置通知
+
+后置通知是在连接点完成之后执行的，即连接点返回结果或者抛出异常的时候，下面的后置通知记录了方法的终止。 一个切面可以包括一个或者多个通知。
+
+修改前面的切面类，添加后置通知方法，修改后的切面类如下所示：
+
+```java
+//通过添加 @Aspect 注解声明一个 bean 是一个切面!
+@Aspect
+@Component
+public class LoggingAspect {
+
+	// 声明该方法是一个前置通知，在目标方法开始前执行
+	@Before("execution(public int com.jack.spring.impl.ArithmeticCalculator.*(int, int))")
+	public void beforeMethod(JoinPoint joinPoint){
+		String methodName = joinPoint.getSignature().getName();
+		Object [] args = joinPoint.getArgs();
+
+		System.out.println("The method " + methodName + " begins with " + Arrays.asList(args));
+	}
+
+	// 后置通知，在目标方法执行后（无论是否发生异常）执行的通知
+	// 在后置通知中还不能访问目标方法执行的结果
+	@After("execution(* com.jack.spring.impl.ArithmeticCalculator.*(int, int))")
+	public void afterMethod(JoinPoint joinPoint){
+		String methodName = joinPoint.getSignature().getName();
+		System.out.println("The method " + methodName + " ends");
+	}
+
+}
+```
+
+重新运行测试方法：
+
+```
+The method add begins with [11, 12]
+The method add ends
+result:23
+The method div begins with [21, 3]
+The method div ends
 result:7
 ```
 
