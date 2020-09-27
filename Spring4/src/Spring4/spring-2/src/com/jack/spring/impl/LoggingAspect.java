@@ -3,9 +3,8 @@ package com.jack.spring.impl;
 import java.util.Arrays;
 
 import org.aspectj.lang.JoinPoint;
-import org.aspectj.lang.annotation.After;
-import org.aspectj.lang.annotation.Aspect;
-import org.aspectj.lang.annotation.Before;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.*;
 import org.springframework.stereotype.Component;
 
 /**
@@ -44,22 +43,73 @@ import org.springframework.stereotype.Component;
 @Aspect
 @Component
 public class LoggingAspect {
+//
+//	// 声明该方法是一个前置通知，在目标方法开始前执行
+//	@Before("execution(public int com.jack.spring.impl.ArithmeticCalculator.*(int, int))")
+//	public void beforeMethod(JoinPoint joinPoint){
+//		String methodName = joinPoint.getSignature().getName();
+//		Object [] args = joinPoint.getArgs();
+//
+//		System.out.println("The method " + methodName + " begins with " + Arrays.asList(args));
+//	}
+//
+//	// 后置通知，在目标方法执行后（无论是否发生异常）执行的通知
+//	// 在后置通知中还不能访问目标方法执行的结果
+//	@After("execution(* com.jack.spring.impl.ArithmeticCalculator.*(int, int))")
+//	public void afterMethod(JoinPoint joinPoint){
+//		String methodName = joinPoint.getSignature().getName();
+//		System.out.println("The method " + methodName + " ends");
+//	}
+//
+//	/**
+//	 * 在方法法正常结束受执行的代码
+//	 * 返回通知是可以访问到方法的返回值的
+//	 */
+//	@AfterReturning(value="execution(* com.jack.spring.impl.ArithmeticCalculator.*(int, int))",
+//			returning="result")
+//	public void afterReturning(JoinPoint joinPoint, Object result){
+//		String methodName = joinPoint.getSignature().getName();
+//		System.out.println("The method " + methodName + " ends with " + result);
+//	}
+//
+//	/**
+//	 * 在目标方法出现异常时会执行的代码.
+//	 * 可以访问到异常对象; 且可以指定在出现特定异常时在执行通知代码
+//	 */
+//	@AfterThrowing(value="execution(* com.jack.spring.impl.ArithmeticCalculator.*(int, int))",
+//			throwing="e")
+//	public void afterThrowing(JoinPoint joinPoint, Exception e){
+//		String methodName = joinPoint.getSignature().getName();
+//		System.out.println("The method " + methodName + " occurs excetion:" + e);
+//	}
 
-	// 声明该方法是一个前置通知，在目标方法开始前执行
-	@Before("execution(public int com.jack.spring.impl.ArithmeticCalculator.*(int, int))")
-	public void beforeMethod(JoinPoint joinPoint){
-		String methodName = joinPoint.getSignature().getName();
-		Object [] args = joinPoint.getArgs();
+	/**
+	 * 环绕通知需要携带 ProceedingJoinPoint 类型的参数.
+	 * 环绕通知类似于动态代理的全过程: ProceedingJoinPoint 类型的参数可以决定是否执行目标方法.
+	 * 且环绕通知必须有返回值, 返回值即为目标方法的返回值
+	 */
 
-		System.out.println("The method " + methodName + " begins with " + Arrays.asList(args));
-	}
+	@Around("execution(* com.jack.spring.impl.ArithmeticCalculator.*(int, int))")
+	public Object aroundMethod(ProceedingJoinPoint pjd){
 
-	// 后置通知，在目标方法执行后（无论是否发生异常）执行的通知
-	// 在后置通知中还不能访问目标方法执行的结果
-	@After("execution(* com.jack.spring.impl.ArithmeticCalculator.*(int, int))")
-	public void afterMethod(JoinPoint joinPoint){
-		String methodName = joinPoint.getSignature().getName();
+		Object result = null;
+		String methodName = pjd.getSignature().getName();
+
+		try {
+			//前置通知
+			System.out.println("The method " + methodName + " begins with " + Arrays.asList(pjd.getArgs()));
+			//执行目标方法
+			result = pjd.proceed();
+			//返回通知
+			System.out.println("The method " + methodName + " ends with " + result);
+		} catch (Throwable e) {
+			//异常通知
+			System.out.println("The method " + methodName + " occurs exception:" + e);
+			throw new RuntimeException(e);
+		}
+		//后置通知
 		System.out.println("The method " + methodName + " ends");
-	}
 
+		return result;
+	}
 }

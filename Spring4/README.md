@@ -53,6 +53,9 @@
       - [（1）AspectJ 注解声明切面](#1aspectj-%E6%B3%A8%E8%A7%A3%E5%A3%B0%E6%98%8E%E5%88%87%E9%9D%A2)
         - [A、前置通知](#a%E5%89%8D%E7%BD%AE%E9%80%9A%E7%9F%A5)
         - [B、后置通知](#b%E5%90%8E%E7%BD%AE%E9%80%9A%E7%9F%A5)
+        - [C、返回通知](#c%E8%BF%94%E5%9B%9E%E9%80%9A%E7%9F%A5)
+        - [D、异常通知](#d%E5%BC%82%E5%B8%B8%E9%80%9A%E7%9F%A5)
+        - [E、环绕通知](#e%E7%8E%AF%E7%BB%95%E9%80%9A%E7%9F%A5)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -2729,4 +2732,208 @@ The method div begins with [21, 3]
 The method div ends
 result:7
 ```
+
+##### C、返回通知
+
+无论连接点是正常返回还是抛出异常，后置通知都会执行。 如果只想在连接点返回的时候记录日志，应使用返回通知代替后置通知。
+
+在返回通知中，只要将 returning 属性添加到 @AfterReturning 注解中，就可以访问连接点的返回值。该属性的值即为用来传入返回值的参数名称。 
+
+必须在通知方法的签名中添加一个同名参数，在运行时，Spring AOP 会通过这个参数传递返回值。
+
+原始的切点表达式需要出现在 pointcut 属性中。
+
+修改 LoggingAspect ，添加：
+
+```java
+	/**
+	 * 在方法法正常结束受执行的代码
+	 * 返回通知是可以访问到方法的返回值的
+	 */
+	@AfterReturning(value="execution(* com.jack.spring.impl.ArithmeticCalculator.*(int, int))",
+			returning="result")
+	public void afterReturning(JoinPoint joinPoint, Object result){
+		String methodName = joinPoint.getSignature().getName();
+		System.out.println("The method " + methodName + " ends with " + result);
+	}
+```
+
+测试结果如下：
+
+```
+The method add begins with [11, 12]
+The method add ends
+The method add ends with 23
+result:23
+The method div begins with [21, 3]
+The method div ends
+The method div ends with 7
+result:7
+```
+
+##### D、异常通知
+
+只在连接点抛出异常时才执行异常通知。
+
+将 throwing 属性添加到 @AfterThrowing 注解中，也可以访问连接点抛出的异常。Throwable 是所有错误和异常类的超类，所以在异常通知方法可以捕获到任何错误和异常。
+
+如果只对某种特殊的异常类型感兴趣，可以将参数声明为其他异常的参数类型，然后通知就只在抛出这个类型及其子类的异常时才被执行。
+
+修改LoggingAspect 代码，添加：
+
+```java
+	/**
+	 * 在目标方法出现异常时会执行的代码.
+	 * 可以访问到异常对象; 且可以指定在出现特定异常时在执行通知代码
+	 */
+	@AfterThrowing(value="execution(* com.jack.spring.impl.ArithmeticCalculator.*(int, int))",
+			throwing="e")
+	public void afterThrowing(JoinPoint joinPoint, Exception e){
+		String methodName = joinPoint.getSignature().getName();
+		System.out.println("The method " + methodName + " occurs excetion:" + e);
+	}
+```
+
+修改测试代码，人为构建一个除零异常：
+
+```java
+result = arithmeticCalculator.div(21, 0);
+System.out.println("result:" + result);
+```
+
+测试结果如下：
+
+```java
+The method add begins with [11, 12]
+The method add ends
+The method add ends with 23
+result:23
+The method div begins with [21, 0]
+The method div ends
+The method div occurs excetion:java.lang.ArithmeticException: / by zero
+Exception in thread "main" java.lang.ArithmeticException: / by zero
+	at com.jack.spring.impl.ArithmeticCalculatorImpl.div(ArithmeticCalculatorImpl.java:28)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+    ...
+	at com.sun.proxy.$Proxy19.div(Unknown Source)
+	at com.jack.spring.impl.Main.main(Main.java:16)
+```
+
+异常被捕获了。
+
+##### E、环绕通知
+
+环绕通知是所有通知类型中功能最为强大的， 能够全面地控制连接点。 甚至可以控制是否执行连接点。
+
+对于环绕通知来说， 连接点的参数类型必须是 ProceedingJoinPoint，它是 JoinPoint 的子接口，允许控制何时执行，是否执行连接点。在环绕通知中需要明确调用 ProceedingJoinPoint 的 proceed() 方法来执行被代理的方法，如果忘记这样做就会导致通知被执行了，但目标方法没有被执行。
+
+**注意**：**环绕通知的方法需要返回目标方法执行之后的结果**， 即调用 joinPoint.proceed() 的返回值，否则会出现空指针异常。
+
+为了方便演示，注释掉 LoggingAspect 中的其他通知代码，只添加环绕通知代码：
+
+```java
+	/**
+	 * 环绕通知需要携带 ProceedingJoinPoint 类型的参数.
+	 * 环绕通知类似于动态代理的全过程: ProceedingJoinPoint 类型的参数可以决定是否执行目标方法.
+	 * 且环绕通知必须有返回值, 返回值即为目标方法的返回值
+	 */
+
+	@Around("execution(* com.jack.spring.impl.ArithmeticCalculator.*(int, int))")
+	public Object aroundMethod(ProceedingJoinPoint pjd){
+
+		Object result = null;
+		String methodName = pjd.getSignature().getName();
+
+		try {
+			//前置通知
+			System.out.println("The method " + methodName + " begins with " + Arrays.asList(pjd.getArgs()));
+			//执行目标方法
+			result = pjd.proceed();
+			//返回通知
+			System.out.println("The method " + methodName + " ends with " + result);
+		} catch (Throwable e) {
+			//异常通知
+			System.out.println("The method " + methodName + " occurs exception:" + e);
+			throw new RuntimeException(e);
+		}
+		//后置通知
+		System.out.println("The method " + methodName + " ends");
+		
+		return result;
+	}
+```
+
+同样地，修改测试代码：
+
+```java
+int result = arithmeticCalculator.add(11, 12);
+System.out.println("result:" + result);
+
+result = arithmeticCalculator.div(21, 3);
+System.out.println("result:" + result);
+```
+
+测试结果如下：
+
+```
+The method add begins with [11, 12]
+The method add ends with 23
+The method add ends
+result:23
+The method div begins with [21, 3]
+The method div ends with 7
+The method div ends
+result:7
+```
+
+可以再回顾下动态代理的代码：
+
+```java
+	public ArithmeticCalculator getLoggingProxy(){
+		ArithmeticCalculator proxy = null;
+		// 代理对象由哪一个类加载器负责加载
+		ClassLoader loader = target.getClass().getClassLoader();
+		// 代理对象的类型
+		Class [] interfaces = new Class[]{ArithmeticCalculator.class};
+		// 当具体调用代理对象的方法时，该执行的代码
+		InvocationHandler h = new InvocationHandler() {
+			/**
+			 * proxy: 代理对象。 一般不使用该对象
+			 * method: 正在被调用的方法
+			 * args: 调用方法传入的参数
+			 */
+			@Override
+			public Object invoke(Object proxy, Method method, Object[] args)
+					throws Throwable {
+				String methodName = method.getName();
+				//打印日志
+				System.out.println("[before] The method " + methodName + " begins with " + Arrays.asList(args));
+				//调用目标方法
+				Object result = null;
+				try {
+					//前置通知
+					result = method.invoke(target, args);
+					//返回通知, 可以访问到方法的返回值
+				} catch (NullPointerException e) {
+					e.printStackTrace();
+					//异常通知, 可以访问到方法出现的异常
+				}
+				//后置通知. 因为方法可以能会出异常, 所以访问不到方法的返回值
+				System.out.println("[after] The method ends with " + result);
+				return result;
+			}
+		};
+		/**
+		 * loader: 代理对象使用的类加载器。
+		 * interfaces: 指定代理对象的类型. 即代理代理对象中可以有哪些方法.
+		 * h: 当具体调用代理对象的方法时, 应该如何进行响应, 实际上就是调用 InvocationHandler 的 invoke 方法
+		 */
+		proxy = (ArithmeticCalculator) Proxy.newProxyInstance(loader, interfaces, h);
+
+		return proxy;
+	}
+
+```
+
+**环绕通知的作用等价于动态代理。**
 
