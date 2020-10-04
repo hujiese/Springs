@@ -58,6 +58,13 @@
         - [E、环绕通知](#e%E7%8E%AF%E7%BB%95%E9%80%9A%E7%9F%A5)
       - [（2）指定切面的优先级](#2%E6%8C%87%E5%AE%9A%E5%88%87%E9%9D%A2%E7%9A%84%E4%BC%98%E5%85%88%E7%BA%A7)
       - [（3）重用切入点定义](#3%E9%87%8D%E7%94%A8%E5%88%87%E5%85%A5%E7%82%B9%E5%AE%9A%E4%B9%89)
+  - [五、JDBC](#%E4%BA%94jdbc)
+    - [1、测试连接](#1%E6%B5%8B%E8%AF%95%E8%BF%9E%E6%8E%A5)
+    - [2、更新数据](#2%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE)
+    - [3、批量插入更新数据](#3%E6%89%B9%E9%87%8F%E6%8F%92%E5%85%A5%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE)
+    - [4、从数据库中获取一个对象](#4%E4%BB%8E%E6%95%B0%E6%8D%AE%E5%BA%93%E4%B8%AD%E8%8E%B7%E5%8F%96%E4%B8%80%E4%B8%AA%E5%AF%B9%E8%B1%A1)
+    - [5、查询实体类集合](#5%E6%9F%A5%E8%AF%A2%E5%AE%9E%E4%BD%93%E7%B1%BB%E9%9B%86%E5%90%88)
+    - [6、聚合函数](#6%E8%81%9A%E5%90%88%E5%87%BD%E6%95%B0)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -3301,4 +3308,381 @@ The method div ends
 The method div ends with 7
 result:7
 ```
+
+## 五、JDBC
+
+为了使 JDBC 更加易于使用，Spring 在 JDBC API 上定义了一个抽象层，以此建立一个 JDBC 存取框架。
+
+作为 Spring JDBC 框架的核心，JDBC 模板的设计目的是为不同类型的 JDBC 操作提供模板方法。 每个模板方法都能控制整个过程，并允许覆盖过程中的特定任务。 通过这种方式，可以在尽可能保留灵活性的情况下，将数据库存取的工作量降到最低。
+
+为了方便演示，这里新建一个spring工程，**工程中需要导入两个jar包：c3p0-0.9.1.2.jar 和 mysql-connector-java-5.1.7-bin.jar**。
+
+**1、创建包 com.jack.spring.jdbc**
+
+**2、创建数据库配置文件 db.properties ：**
+
+```
+jdbc.user=root
+jdbc.password=123
+jdbc.driverClass=com.mysql.jdbc.Driver
+jdbc.jdbcUrl=jdbc:mysql:///spring4
+
+jdbc.initPoolSize=5
+jdbc.maxPoolSize=10
+```
+
+**3、创建spring配置文件：**
+
+```xml
+    <context:component-scan base-package="com.jack.spring"></context:component-scan>
+
+    <!-- 导入资源文件 -->
+    <context:property-placeholder location="classpath:db.properties"/>
+
+    <!-- 配置 C3P0 数据源 -->
+    <bean id="dataSource"
+          class="com.mchange.v2.c3p0.ComboPooledDataSource">
+        <property name="user" value="${jdbc.user}"></property>
+        <property name="password" value="${jdbc.password}"></property>
+        <property name="jdbcUrl" value="${jdbc.jdbcUrl}"></property>
+        <property name="driverClass" value="${jdbc.driverClass}"></property>
+
+        <property name="initialPoolSize" value="${jdbc.initPoolSize}"></property>
+        <property name="maxPoolSize" value="${jdbc.maxPoolSize}"></property>
+    </bean>
+
+    <!-- 配置 Spirng 的 JdbcTemplate -->
+    <bean id="jdbcTemplate"
+          class="org.springframework.jdbc.core.JdbcTemplate">
+        <property name="dataSource" ref="dataSource"></property>
+    </bean>
+```
+
+**4、创建一个数据库spring4，创建两张表**。
+
+建表语句如下：
+
+```sql
+CREATE TABLE `departments` (
+  `ID` int(11) NOT NULL AUTO_INCREMENT,
+  `DEPT_NAME` varchar(20) DEFAULT NULL,
+  PRIMARY KEY (`ID`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8;
+
+INSERT INTO `departments` VALUES (1,'财务部'),(2,'开发部'),(3,'人事部'),(4,'公关部');
+
+CREATE TABLE `employees` (
+  `ID` int(11) NOT NULL AUTO_INCREMENT,
+  `LAST_NAME` varchar(20) DEFAULT NULL,
+  `EMAIL` varchar(50) DEFAULT NULL,
+  `DEPT_ID` int(11) DEFAULT NULL,
+  PRIMARY KEY (`ID`),
+  KEY `fk_dept_id` (`DEPT_ID`),
+  CONSTRAINT `fk_dept_id` FOREIGN KEY (`DEPT_ID`) REFERENCES `departments` (`ID`)
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8;
+
+INSERT INTO `employees` VALUES (1,'Tom','tom@163.com',1),(2,'Jerry','jerry@126.com',2),(3,'Mike','mike@souhu.com',3),(4,'Rose','rose@sina.com',3),(5,'Atguigu','atguigu@163.com',2);
+```
+
+**其中employees.DEPT_ID为外键，引用departments的主键id。**
+
+查询可得：
+
+```sql
+mysql> select * from departments;
++----+-----------+
+| ID | DEPT_NAME |
++----+-----------+
+|  1 | 财务部     |
+|  2 | 开发部     |
+|  3 | 人事部     |
+|  4 | 公关部     |
++----+-----------+
+```
+
+```sql
+mysql> select * from employees;
++----+-----------+-----------------+---------+
+| ID | LAST_NAME | EMAIL           | DEPT_ID |
++----+-----------+-----------------+---------+
+|  1 | Tom       | tom@163.com     |       1 |
+|  2 | Jerry     | jerry@126.com   |       2 |
+|  3 | Mike      | mike@souhu.com  |       3 |
+|  4 | Rose      | rose@sina.com   |       3 |
+|  5 | Atguigu   | atguigu@163.com |       2 |
++----+-----------+-----------------+---------+
+```
+
+**5、在com.jack.spring.jdbc 中创建两个类**：
+
+```java
+public class Department {
+
+	private Integer id;
+	private String name;
+
+	public Integer getId() {
+		return id;
+	}
+
+	public void setId(Integer id) {
+		this.id = id;
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	@Override
+	public String toString() {
+		return "Department [id=" + id + ", name=" + name + "]";
+	}
+
+}
+```
+
+```java
+public class Employee {
+	
+	private Integer id;
+	private String lastName;
+	private String email;
+	
+	private Integer dpetId;
+
+	public Integer getId() {
+		return id;
+	}
+
+	public void setId(Integer id) {
+		this.id = id;
+	}
+
+	public String getLastName() {
+		return lastName;
+	}
+
+	public void setLastName(String lastName) {
+		this.lastName = lastName;
+	}
+
+	public String getEmail() {
+		return email;
+	}
+
+	public void setEmail(String email) {
+		this.email = email;
+	}
+
+	public Integer getDpetId() {
+		return dpetId;
+	}
+
+	public void setDpetId(Integer dpetId) {
+		this.dpetId = dpetId;
+	}
+
+	@Override
+	public String toString() {
+		return "Employee [id=" + id + ", lastName=" + lastName + ", email="
+				+ email + ", dpetId=" + dpetId + "]";
+	}
+}
+```
+
+**6、创建 JDBCTest 类**。
+
+到这里，准备工作就做完了。
+
+### 1、测试连接
+
+向测试类中添加：
+
+```java
+private ApplicationContext ctx = null;
+```
+
+```java
+	{
+		ctx = new ClassPathXmlApplicationContext("applicationContext.xml");
+	}
+```
+
+```java
+	@Test
+	public void testDataSource() throws SQLException {
+		DataSource dataSource = ctx.getBean(DataSource.class);
+		System.out.println(dataSource.getConnection());
+	}
+```
+
+执行结果如下：
+
+```
+com.mchange.v2.c3p0.impl.NewProxyConnection@24313fcc
+```
+
+### 2、更新数据
+
+向测试类中添加：
+
+```java
+private JdbcTemplate jdbcTemplate;
+```
+
+```java
+    {
+      ...
+      jdbcTemplate = (JdbcTemplate) ctx.getBean("jdbcTemplate");
+   }
+```
+
+```java
+/**
+ * 执行 INSERT, UPDATE, DELETE
+ */
+@Test
+public void testUpdate(){
+   String sql = "UPDATE employees SET last_name = ? WHERE id = ?";
+   jdbcTemplate.update(sql, "Jack", 5);
+}
+```
+
+将 employees表的：
+
+```sql
+|  5 | Atguigu   | atguigu@163.com |       2 |
+```
+
+修改为了：
+
+```sql
+|  5 | Jack      | atguigu@163.com |       2 |
+```
+
+### 3、批量插入更新数据
+
+向测试类中添加：
+
+```java
+	/**
+	 * 执行批量更新: 批量的 INSERT, UPDATE, DELETE
+	 * 最后一个参数是 Object[] 的 List 类型: 因为修改一条记录需要一个 Object 的数组, 那么多条不就需要多个 Object 的数组吗
+	 */
+	@Test
+	public void testBatchUpdate(){
+		String sql = "INSERT INTO employees(last_name, email, dept_id) VALUES(?,?,?)";
+
+		List<Object[]> batchArgs = new ArrayList<>();
+
+		batchArgs.add(new Object[]{"AA", "aa@atguigu.com", 1});
+		batchArgs.add(new Object[]{"BB", "bb@atguigu.com", 2});
+		batchArgs.add(new Object[]{"CC", "cc@atguigu.com", 3});
+		batchArgs.add(new Object[]{"DD", "dd@atguigu.com", 3});
+		batchArgs.add(new Object[]{"EE", "ee@atguigu.com", 2});
+
+		jdbcTemplate.batchUpdate(sql, batchArgs);
+	}
+```
+
+执行后，数据库查询结果如下：
+
+```sql
+mysql> select * from employees;
++----+-----------+-----------------+---------+
+| ID | LAST_NAME | EMAIL           | DEPT_ID |
++----+-----------+-----------------+---------+
+|  1 | Tom       | tom@163.com     |       1 |
+|  2 | Jerry     | jerry@126.com   |       2 |
+|  3 | Mike      | mike@souhu.com  |       3 |
+|  4 | Rose      | rose@sina.com   |       3 |
+|  5 | Jack      | atguigu@163.com |       2 |
+|  6 | AA        | aa@atguigu.com  |       1 |
+|  7 | BB        | bb@atguigu.com  |       2 |
+|  8 | CC        | cc@atguigu.com  |       3 |
+|  9 | DD        | dd@atguigu.com  |       3 |
+| 10 | EE        | ee@atguigu.com  |       2 |
++----+-----------+-----------------+---------+
+10 rows in set (0.00 sec)
+```
+
+### 4、从数据库中获取一个对象
+
+```java
+	/**
+	 * 从数据库中获取一条记录, 实际得到对应的一个对象
+	 * 注意不是调用 queryForObject(String sql, Class<Employee> requiredType, Object... args) 方法!
+	 * 而需要调用 queryForObject(String sql, RowMapper<Employee> rowMapper, Object... args)
+	 * 1. 其中的 RowMapper 指定如何去映射结果集的行, 常用的实现类为 BeanPropertyRowMapper
+	 * 2. 使用 SQL 中列的别名完成列名和类的属性名的映射. 例如 last_name lastName
+	 * 3. 不支持级联属性. JdbcTemplate 到底是一个 JDBC 的小工具, 而不是 ORM 框架
+	 */
+	@Test
+	public void testQueryForObject(){
+		String sql = "SELECT id, last_name lastName, email, dept_id as \"department.id\" FROM employees WHERE id = ?";
+		RowMapper<Employee> rowMapper = new BeanPropertyRowMapper<>(Employee.class);
+		Employee employee = jdbcTemplate.queryForObject(sql, rowMapper, 1);
+
+		System.out.println(employee); // Employee [id=1, lastName=Tom, email=tom@163.com, dpetId=null]，deptId不支持级联
+	}
+```
+
+结果如下：
+
+```
+Employee [id=1, lastName=Tom, email=tom@163.com, dpetId=null]
+```
+
+前面建表时制定了employee的dpetid为外键，但是查询结果却是null，这里需要注意的是 **JdbcTemplate 只是一个 JDBC 的小工具，而不是 ORM 框架，不支持级联属性。**
+
+### 5、查询实体类集合
+
+```java
+	/**
+	 * 查到实体类的集合
+	 * 注意调用的不是 queryForList 方法
+	 */
+	@Test
+	public void testQueryForList(){
+		String sql = "SELECT id, last_name lastName, email FROM employees WHERE id > ?";
+		RowMapper<Employee> rowMapper = new BeanPropertyRowMapper<>(Employee.class);
+		List<Employee> employees = jdbcTemplate.query(sql, rowMapper,5);
+
+		System.out.println(employees);
+	}
+```
+
+查询结果如下：
+
+```
+[Employee [id=6, lastName=AA, email=aa@atguigu.com, dpetId=null], Employee [id=7, lastName=BB, email=bb@atguigu.com, dpetId=null], Employee [id=8, lastName=CC, email=cc@atguigu.com, dpetId=null], Employee [id=9, lastName=DD, email=dd@atguigu.com, dpetId=null], Employee [id=10, lastName=EE, email=ee@atguigu.com, dpetId=null]]
+```
+
+### 6、聚合函数
+
+```java
+	/**
+	 * 获取单个列的值, 或做统计查询
+	 * 使用 queryForObject(String sql, Class<Long> requiredType)
+	 */
+	@Test
+	public void testQueryForObject2(){
+		String sql = "SELECT count(id) FROM employees";
+		long count = jdbcTemplate.queryForObject(sql, Long.class);
+
+		System.out.println(count);
+	}
+```
+
+查询结果如下：
+
+```
+10
+```
+
+
 
