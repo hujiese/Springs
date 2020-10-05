@@ -65,6 +65,8 @@
     - [4、从数据库中获取一个对象](#4%E4%BB%8E%E6%95%B0%E6%8D%AE%E5%BA%93%E4%B8%AD%E8%8E%B7%E5%8F%96%E4%B8%80%E4%B8%AA%E5%AF%B9%E8%B1%A1)
     - [5、查询实体类集合](#5%E6%9F%A5%E8%AF%A2%E5%AE%9E%E4%BD%93%E7%B1%BB%E9%9B%86%E5%90%88)
     - [6、聚合函数](#6%E8%81%9A%E5%90%88%E5%87%BD%E6%95%B0)
+    - [7、简化 JDBC 模板查询](#7%E7%AE%80%E5%8C%96-jdbc-%E6%A8%A1%E6%9D%BF%E6%9F%A5%E8%AF%A2)
+    - [8、在 JDBC 模板中使用具名参数](#8%E5%9C%A8-jdbc-%E6%A8%A1%E6%9D%BF%E4%B8%AD%E4%BD%BF%E7%94%A8%E5%85%B7%E5%90%8D%E5%8F%82%E6%95%B0)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -3684,5 +3686,168 @@ Employee [id=1, lastName=Tom, email=tom@163.com, dpetId=null]
 10
 ```
 
+### 7、简化 JDBC 模板查询
 
+每次使用都创建一个 JdbcTemplate 的新实例，这种做法效率很低下。JdbcTemplate 类被设计成为线程安全的，所以可以再 IOC 容器中声明它的单个实例，并将这个实例注入到所有的 DAO 实例中。
+
+JdbcTemplate 也利用了 Java 1。5 的特定(自动装箱，泛型，可变长度等)来简化开发Spring JDBC 框架还提供了一个 JdbcDaoSupport 类来简化 DAO 实现。 该类声明了 jdbcTemplate 属性，它可以从 IOC 容器中注入，或者自动从数据源中创建。
+
+在spring配置文件applicationContext.xml中有：
+
+```java
+    <!-- 配置 Spirng 的 JdbcTemplate -->
+    <bean id="jdbcTemplate"
+          class="org.springframework.jdbc.core.JdbcTemplate">
+        <property name="dataSource" ref="dataSource"></property>
+    </bean>
+```
+
+创建 EmployeeDao 类：
+
+```java
+@Repository
+public class EmployeeDao {
+	
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
+	
+	public Employee get(Integer id){
+		String sql = "SELECT id, last_name lastName, email FROM employees WHERE id = ?";
+		RowMapper<Employee> rowMapper = new BeanPropertyRowMapper<>(Employee.class);
+		Employee employee = jdbcTemplate.queryForObject(sql, rowMapper, id);
+		
+		return employee;
+	}
+}
+```
+
+然后在测试类中添加：
+
+```java
+private EmployeeDao employeeDao;
+```
+
+```java
+	{
+		ctx = new ClassPathXmlApplicationContext("applicationContext.xml");
+		jdbcTemplate = (JdbcTemplate) ctx.getBean("jdbcTemplate");
+		employeeDao = ctx.getBean(EmployeeDao.class);
+        ...
+	}
+```
+
+```java
+	@Test
+	public void testEmployeeDao(){
+		System.out.println(employeeDao.get(1));
+	}
+```
+
+测试结果如下：
+
+```
+Employee [id=1, lastName=Tom, email=tom@163.com, dpetId=null]
+```
+
+当然，也可以采用继承 JdbcDaoSupport 的方式，不推荐使用 JdbcDaoSupport, 而推荐直接使用 JdbcTempate 作为 Dao 类的成员变量。
+
+### 8、在 JDBC 模板中使用具名参数
+
+在经典的 JDBC 用法中，SQL 参数是用占位符 ? 表示，并且受到位置的限制。 定位参数的问题在于，一旦参数的顺序发生变化，就必须改变参数绑定。 在 Spring JDBC 框架中，绑定 SQL 参数的另一种选择是使用具名参数(named parameter)。 
+
+具名参数: SQL 按名称(以冒号开头)而不是按位置进行指定。 具名参数更易于维护，也提升了可读性。 具名参数由框架类在运行时用占位符取代具名参数只在 NamedParameterJdbcTemplate 中得到支持 。
+
+在spring配置文件applicationContext.xml中添加：
+
+```xml
+    <!-- 配置 NamedParameterJdbcTemplate, 该对象可以使用具名参数, 其没有无参数的构造器, 所以必须为其构造器指定参数 -->
+    <bean id="namedParameterJdbcTemplate"
+          class="org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate">
+        <constructor-arg ref="dataSource"></constructor-arg>
+    </bean>
+```
+
+在测试类中添加：
+
+```java
+private NamedParameterJdbcTemplate namedParameterJdbcTemplate;
+```
+
+```java
+	{
+        ...
+		namedParameterJdbcTemplate = ctx.getBean(NamedParameterJdbcTemplate.class);
+	}
+```
+
+```java
+	/**
+	 * 可以为参数起名字.
+	 * 1. 好处: 若有多个参数, 则不用再去对应位置, 直接对应参数名, 便于维护
+	 * 2. 缺点: 较为麻烦.
+	 */
+	@Test
+	public void testNamedParameterJdbcTemplate(){
+		String sql = "INSERT INTO employees(last_name, email, dept_id) VALUES(:ln,:email,:deptid)";
+
+		Map<String, Object> paramMap = new HashMap<>();
+		paramMap.put("ln", "FF");
+		paramMap.put("email", "ff@atguigu.com");
+		paramMap.put("deptid", 2);
+
+		namedParameterJdbcTemplate.update(sql, paramMap);
+	}
+```
+
+测试结果，查询数据库结果如下：
+
+```sql
+mysql> select * from employees;
++----+-----------+-----------------+---------+
+| ID | LAST_NAME | EMAIL           | DEPT_ID |
++----+-----------+-----------------+---------+
+|  1 | Tom       | tom@163.com     |       1 |
+				....
+| 11 | FF        | ff@atguigu.com  |       2 |
++----+-----------+-----------------+---------+
+11 rows in set (0.00 sec)
+```
+
+这种方法虽然维护性比价好，但是每次都这样通过key-value方式去更新数据显得太麻烦了，所以下面采取另一种方式：
+
+```java
+	/**
+	 * 使用具名参数时, 可以使用 update(String sql, SqlParameterSource paramSource) 方法进行更新操作
+	 * 1. SQL 语句中的参数名和类的属性一致!
+	 * 2. 使用 SqlParameterSource 的 BeanPropertySqlParameterSource 实现类作为参数.
+	 */
+	@Test
+	public void testNamedParameterJdbcTemplate2(){
+		String sql = "INSERT INTO employees(last_name, email, dept_id) "
+				+ "VALUES(:lastName,:email,:dpetId)";
+
+		Employee employee = new Employee();
+		employee.setLastName("XYZ");
+		employee.setEmail("xyz@sina.com");
+		employee.setDpetId(3);
+
+		SqlParameterSource paramSource = new BeanPropertySqlParameterSource(employee);
+		namedParameterJdbcTemplate.update(sql, paramSource);
+	}
+```
+
+查询数据库结果如下：
+
+```sql
+mysql> select * from employees;
++----+-----------+-----------------+---------+
+| ID | LAST_NAME | EMAIL           | DEPT_ID |
++----+-----------+-----------------+---------+
+|  1 | Tom       | tom@163.com     |       1 |
+			.....
+| 11 | FF        | ff@atguigu.com  |       2 |
+| 12 | XYZ       | xyz@sina.com    |       3 |
++----+-----------+-----------------+---------+
+12 rows in set (0.00 sec)
+```
 
