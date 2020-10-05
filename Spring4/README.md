@@ -67,6 +67,8 @@
     - [6、聚合函数](#6%E8%81%9A%E5%90%88%E5%87%BD%E6%95%B0)
     - [7、简化 JDBC 模板查询](#7%E7%AE%80%E5%8C%96-jdbc-%E6%A8%A1%E6%9D%BF%E6%9F%A5%E8%AF%A2)
     - [8、在 JDBC 模板中使用具名参数](#8%E5%9C%A8-jdbc-%E6%A8%A1%E6%9D%BF%E4%B8%AD%E4%BD%BF%E7%94%A8%E5%85%B7%E5%90%8D%E5%8F%82%E6%95%B0)
+  - [六、Spring 中的事务管理](#%E5%85%ADspring-%E4%B8%AD%E7%9A%84%E4%BA%8B%E5%8A%A1%E7%AE%A1%E7%90%86)
+    - [1、用 @Transactional 注解声明式地管理事务](#1%E7%94%A8-transactional-%E6%B3%A8%E8%A7%A3%E5%A3%B0%E6%98%8E%E5%BC%8F%E5%9C%B0%E7%AE%A1%E7%90%86%E4%BA%8B%E5%8A%A1)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -3757,6 +3759,8 @@ Employee [id=1, lastName=Tom, email=tom@163.com, dpetId=null]
 
 具名参数: SQL 按名称(以冒号开头)而不是按位置进行指定。 具名参数更易于维护，也提升了可读性。 具名参数由框架类在运行时用占位符取代具名参数只在 NamedParameterJdbcTemplate 中得到支持 。
 
+在 SQL 语句中使用具名参数时， 可以在一个 Map 中提供参数值， 参数名为键；也可以使用 SqlParameterSource 参数。批量更新时可以提供 Map 或 SqlParameterSource 的数组。
+
 在spring配置文件applicationContext.xml中添加：
 
 ```xml
@@ -3851,3 +3855,416 @@ mysql> select * from employees;
 12 rows in set (0.00 sec)
 ```
 
+## 六、Spring 中的事务管理
+
+事务管理是企业级应用程序开发中必不可少的技术， 用来确保数据的完整性和一致性。 事务就是一系列的动作，它们被当做一个单独的工作单元，这些动作要么全部完成，要么全部不起作用。
+
+事务的四个关键属性(ACID)：
+
+* **原子性(atomicity)**: 事务是一个原子操作，由一系列动作组成。 事务的原子性确保动作要么全部完成要么完全不起作用。
+* **一致性(consistency)**: 一旦所有事务动作完成，事务就被提交。 数据和资源就处于一种满足业务规则的一致性状态中。
+* **隔离性(isolation)**: 可能有许多事务会同时处理相同的数据，因此每个事物都应该与其他事务隔离开来，防止数据损坏。
+* **持久性(durability)**: 一旦事务完成，无论发生什么系统错误，它的结果都不应该受到影响。 通常情况下，事务的结果被写到持久化存储器中。
+
+作为企业级应用程序框架，Spring 在不同的事务管理 API 之上定义了一个抽象层。 而应用程序开发人员不必了解底层的事务管理 API，就可以使用 Spring 的事务管理机制。Spring 既支持编程式事务管理，也支持声明式的事务管理。
+
+**编程式事务管理**: 将事务管理代码嵌入到业务方法中来控制事务的提交和回滚。 在编程式管理事务时，必须在每个事务操作中包含额外的事务管理代码。 
+
+**声明式事务管理**: 大多数情况下比编程式事务管理更好用。 它将事务管理代码从业务方法中分离出来，以声明的方式来实现事务管理。 事务管理作为一种横切关注点，可以通过 AOP 方法模块化。 Spring 通过 Spring AOP 框架支持声明式事务管理。
+
+Spring 从不同的事务管理 API 中抽象了一整套的事务机制。 开发人员不必了解底层的事务 API，就可以利用这些事务机制。 有了这些事务机制，事务管理代码就能独立于特定的事务技术了。Spring 的核心事务管理抽象是 org.springframework.jdbc.datasource.DataSourceTransactionManager，它为事务管理封装了一组独立于技术的方法。 无论使用 Spring 的哪种事务管理策略(编程式或声明式)，事务管理器都是必须的。DataSourceTransactionManager 在应用程序中只需要处理一个数据源，而且通过 JDBC 存取事务管理器以普通的 Bean 形式声明在 Spring IOC 容器中。
+
+为了演示方便，这里在spring4数据库中创建三张表，建表语句如下：
+
+```sql
+CREATE TABLE `account` (
+  `username` varchar(15) DEFAULT NULL,
+  `balance` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+INSERT INTO `account` VALUES ('AA',160);
+
+
+CREATE TABLE `book` (
+  `isbn` int(10) DEFAULT NULL,
+  `book_name` varchar(20) DEFAULT NULL,
+  `price` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+INSERT INTO `book` VALUES (1001,'Java',100),(1002,'Oracle',70);
+
+CREATE TABLE `book_stock` (
+  `isbn` int(10) DEFAULT NULL,
+  `stock` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+INSERT INTO `book_stock` VALUES (1001,4),(1002,8);
+```
+
+数据库内容如下：
+
+```sql
+mysql> select * from account;
++----------+---------+
+| username | balance |
++----------+---------+
+| AA       |     160 |
++----------+---------+
+1 row in set (0.00 sec)
+
+mysql> select * from book;
++------+-----------+-------+
+| isbn | book_name | price |
++------+-----------+-------+
+| 1001 | Java      |   100 |
+| 1002 | Oracle    |    70 |
++------+-----------+-------+
+2 rows in set (0.00 sec)
+
+mysql> select * from book_stock;
++------+-------+
+| isbn | stock |
++------+-------+
+| 1001 |     4 |
+| 1002 |     8 |
++------+-------+
+2 rows in set (0.00 sec)
+```
+
+接下来创建一个包 com.jack.spring.tx ，添加多个类：
+
+```java
+public interface BookShopDao {
+
+	//根据书号获取书的单价
+	public int findBookPriceByIsbn(String isbn);
+
+	//更新数的库存. 使书号对应的库存 - 1
+	public void updateBookStock(String isbn);
+
+	//更新用户的账户余额: 使 username 的 balance - price
+	public void updateUserAccount(String username, int price);
+}
+```
+
+```java
+public class UserAccountException extends RuntimeException{
+
+	private static final long serialVersionUID = 1L;
+
+	public UserAccountException() {
+		super();
+		// TODO Auto-generated constructor stub
+	}
+
+	public UserAccountException(String message, Throwable cause,
+			boolean enableSuppression, boolean writableStackTrace) {
+		super(message, cause, enableSuppression, writableStackTrace);
+		// TODO Auto-generated constructor stub
+	}
+
+	public UserAccountException(String message, Throwable cause) {
+		super(message, cause);
+		// TODO Auto-generated constructor stub
+	}
+
+	public UserAccountException(String message) {
+		super(message);
+		// TODO Auto-generated constructor stub
+	}
+
+	public UserAccountException(Throwable cause) {
+		super(cause);
+		// TODO Auto-generated constructor stub
+	}
+	
+}
+
+```
+
+```java
+public class BookStockException extends RuntimeException{
+
+	private static final long serialVersionUID = 1L;
+
+	public BookStockException() {
+		super();
+		// TODO Auto-generated constructor stub
+	}
+
+	public BookStockException(String message, Throwable cause,
+			boolean enableSuppression, boolean writableStackTrace) {
+		super(message, cause, enableSuppression, writableStackTrace);
+		// TODO Auto-generated constructor stub
+	}
+
+	public BookStockException(String message, Throwable cause) {
+		super(message, cause);
+		// TODO Auto-generated constructor stub
+	}
+
+	public BookStockException(String message) {
+		super(message);
+		// TODO Auto-generated constructor stub
+	}
+
+	public BookStockException(Throwable cause) {
+		super(cause);
+		// TODO Auto-generated constructor stub
+	}
+
+}
+
+```
+
+```java
+@Repository("bookShopDao")
+public class BookShopDaoImpl implements BookShopDao {
+
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
+
+	@Override
+	public int findBookPriceByIsbn(String isbn) {
+		String sql = "SELECT price FROM book WHERE isbn = ?";
+		return jdbcTemplate.queryForObject(sql, Integer.class, isbn);
+	}
+
+	@Override
+	public void updateBookStock(String isbn) {
+		//检查书的库存是否足够, 若不够, 则抛出异常
+		String sql2 = "SELECT stock FROM book_stock WHERE isbn = ?";
+		int stock = jdbcTemplate.queryForObject(sql2, Integer.class, isbn);
+		if(stock == 0){
+			throw new BookStockException("库存不足!");
+		}
+
+		String sql = "UPDATE book_stock SET stock = stock -1 WHERE isbn = ?";
+		jdbcTemplate.update(sql, isbn);
+	}
+
+	@Override
+	public void updateUserAccount(String username, int price) {
+		//验证余额是否足够, 若不足, 则抛出异常
+		String sql2 = "SELECT balance FROM account WHERE username = ?";
+		int balance = jdbcTemplate.queryForObject(sql2, Integer.class, username);
+		if(balance < price){
+			throw new UserAccountException("余额不足!");
+		}
+
+		String sql = "UPDATE account SET balance = balance - ? WHERE username = ?";
+		jdbcTemplate.update(sql, price, username);
+	}
+
+}
+```
+
+```java
+public interface BookShopService {
+	
+	public void purchase(String username, String isbn);
+	
+}
+```
+
+```java
+@Service("bookShopService")
+public class BookShopServiceImpl implements BookShopService {
+
+	@Autowired
+	private BookShopDao bookShopDao;
+
+	@Override
+	public void purchase(String username, String isbn) {
+
+		try {
+			Thread.sleep(5000);
+		} catch (InterruptedException e) {}
+
+		//1. 获取书的单价
+		int price = bookShopDao.findBookPriceByIsbn(isbn);
+
+		//2. 更新数的库存
+		bookShopDao.updateBookStock(isbn);
+
+		//3. 更新用户余额
+		bookShopDao.updateUserAccount(username, price);
+	}
+
+}
+
+```
+
+编写 SpringTransactionTest 测试类：
+
+```java
+public class SpringTransactionTest {
+
+	private ApplicationContext ctx = null;
+	private BookShopDao bookShopDao = null;
+	private BookShopService bookShopService = null;
+	
+	{
+		ctx = new ClassPathXmlApplicationContext("applicationContext.xml");
+		bookShopDao = ctx.getBean(BookShopDao.class);
+		bookShopService = ctx.getBean(BookShopService.class);
+	}
+
+	@Test
+	public void testBookShopService(){
+		bookShopService.purchase("AA", "1001");
+	}
+}
+```
+
+该类中的testBookShopService方法会首先查找 isbn 为1001的书的价格，然后将该书的库存减一，最后将某用户的账上余额减去该书的价格。
+
+通过查询数据库可以知道isbn=1001的价格为 100：
+
+```sql
+mysql> select price from book where isbn=1001;
++-------+
+| price |
++-------+
+|   100 |
++-------+
+1 row in set (0.00 sec)
+```
+
+该书的库存为 4 ：
+
+```sql
+mysql> select stock from book_stock where isbn=1001;
++-------+
+| stock |
++-------+
+|     4 |
++-------+
+1 row in set (0.00 sec)
+```
+
+账户 AA 的余额为 160 ：
+
+```
+mysql> select balance from account where username='AA';
++---------+
+| balance |
++---------+
+|     160 |
++---------+
+1 row in set (0.00 sec)
+```
+
+执行测试方法之后：
+
+```sql
+mysql> select stock from book_stock where isbn=1001;
++-------+
+| stock |
++-------+
+|     3 |
++-------+
+1 row in set (0.00 sec)
+
+mysql> select balance from account where username='AA';
++---------+
+| balance |
++---------+
+|      60 |
++---------+
+1 row in set (0.00 sec)
+```
+
+这个是正常的，但是，如果再次执行测试方法，由于balance的值为60，不足100，会抛出异常：
+
+```java
+com.jack.spring.tx.UserAccountException: 余额不足!
+
+	at com.jack.spring.tx.BookShopDaoImpl.updateUserAccount(BookShopDaoImpl.java:38)
+	at com.jack.spring.tx.BookShopServiceImpl.purchase(BookShopServiceImpl.java:46)
+    ...
+```
+
+再次查询数据库：
+
+```sql
+mysql> select stock from book_stock where isbn=1001;
++-------+
+| stock |
++-------+
+|     2 |
++-------+
+1 row in set (0.00 sec)
+
+mysql> select balance from account where username='AA';
++---------+
+| balance |
++---------+
+|      60 |
++---------+
+1 row in set (0.00 sec)
+```
+
+发现这一过程中账户余额没有变化，但是书的库存却减少了，这是不合理的，这违反了事务的原子性，上述的三个过程应该是一个整体，要么一起失败，要么一起成功。
+
+### 1、用 @Transactional 注解声明式地管理事务
+
+Spring 允许简单地用 @Transactional 注解来标注事务方法。
+
+为了将方法定义为支持事务处理的， 可以为方法添加 @Transactional 注解。根据 Spring AOP 基于代理机制， 只能标注公有方法.
+可以在方法或者类级别上添加 @Transactional 注解。当把这个注解应用到类上时， 这个类中的所有公共方法都会被定义成支持事务处理的。
+
+在 Bean 配置文件中只需要启用 \<tx:annotation-driven> 元素， 并为之指定事务管理器就可以了。如果事务处理器的名称是 transactionManager， 就可以在\<tx:annotation-driven> 元素中省略 transaction-manager 属性。这个元素会自动检测该名称的事务处理器。
+
+在spring配置文件 applicationContext.xml中添加：
+
+```xml
+    <!-- 配置事务管理器 -->
+    <bean id="transactionManager"
+          class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource"></property>
+    </bean>
+
+    <!-- 启用事务注解 -->
+    <tx:annotation-driven transaction-manager="transactionManager"/>
+```
+
+这样可以开启事务。
+
+修改 BookShopServiceImpl 类：
+
+```java
+	@Transactional
+	@Override
+	public void purchase(String username, String isbn) {
+	...
+```
+
+加上 @Transactional 开启事务。执行测试方法：
+
+```
+com.jack.spring.tx.UserAccountException: 余额不足!
+
+	at com.jack.spring.tx.BookShopDaoImpl.updateUserAccount(BookShopDaoImpl.java:38)
+	at com.jack.spring.tx.BookShopServiceImpl.purchase(BookShopServiceImpl.java:46)
+```
+
+同样报错，再次查询数据库：
+
+```sql
+mysql> select balance from account where username='AA';
++---------+
+| balance |
++---------+
+|      60 |
++---------+
+1 row in set (0.00 sec)
+
+mysql> select stock from book_stock where isbn=1001;
++-------+
+| stock |
++-------+
+|     2 |
++-------+
+1 row in set (0.00 sec)
+```
+
+stock还是上次的2，没有变化，说明这个事务没有执行成功。
