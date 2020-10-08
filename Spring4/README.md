@@ -69,6 +69,13 @@
     - [8、在 JDBC 模板中使用具名参数](#8%E5%9C%A8-jdbc-%E6%A8%A1%E6%9D%BF%E4%B8%AD%E4%BD%BF%E7%94%A8%E5%85%B7%E5%90%8D%E5%8F%82%E6%95%B0)
   - [六、Spring 中的事务管理](#%E5%85%ADspring-%E4%B8%AD%E7%9A%84%E4%BA%8B%E5%8A%A1%E7%AE%A1%E7%90%86)
     - [1、用 @Transactional 注解声明式地管理事务](#1%E7%94%A8-transactional-%E6%B3%A8%E8%A7%A3%E5%A3%B0%E6%98%8E%E5%BC%8F%E5%9C%B0%E7%AE%A1%E7%90%86%E4%BA%8B%E5%8A%A1)
+    - [2、事务传播属性](#2%E4%BA%8B%E5%8A%A1%E4%BC%A0%E6%92%AD%E5%B1%9E%E6%80%A7)
+      - [（1）REQUIRED 传播行为](#1required-%E4%BC%A0%E6%92%AD%E8%A1%8C%E4%B8%BA)
+      - [（2）REQUIRES_NEW 传播行为](#2requires_new-%E4%BC%A0%E6%92%AD%E8%A1%8C%E4%B8%BA)
+      - [（3）设置隔离事务属性](#3%E8%AE%BE%E7%BD%AE%E9%9A%94%E7%A6%BB%E4%BA%8B%E5%8A%A1%E5%B1%9E%E6%80%A7)
+      - [（4）设置回滚事务属性](#4%E8%AE%BE%E7%BD%AE%E5%9B%9E%E6%BB%9A%E4%BA%8B%E5%8A%A1%E5%B1%9E%E6%80%A7)
+      - [（5）超时和只读属性](#5%E8%B6%85%E6%97%B6%E5%92%8C%E5%8F%AA%E8%AF%BB%E5%B1%9E%E6%80%A7)
+    - [3、基于XML方式配置事务](#3%E5%9F%BA%E4%BA%8Exml%E6%96%B9%E5%BC%8F%E9%85%8D%E7%BD%AE%E4%BA%8B%E5%8A%A1)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -4143,7 +4150,7 @@ mysql> select stock from book_stock where isbn=1001;
 
 账户 AA 的余额为 160 ：
 
-```
+```sql
 mysql> select balance from account where username='AA';
 +---------+
 | balance |
@@ -4209,8 +4216,7 @@ mysql> select balance from account where username='AA';
 
 Spring 允许简单地用 @Transactional 注解来标注事务方法。
 
-为了将方法定义为支持事务处理的， 可以为方法添加 @Transactional 注解。根据 Spring AOP 基于代理机制， 只能标注公有方法.
-可以在方法或者类级别上添加 @Transactional 注解。当把这个注解应用到类上时， 这个类中的所有公共方法都会被定义成支持事务处理的。
+为了将方法定义为支持事务处理的， 可以为方法添加 @Transactional 注解。根据 Spring AOP 基于代理机制， 只能标注公有方法。可以在方法或者类级别上添加 @Transactional 注解。当把这个注解应用到类上时， 这个类中的所有公共方法都会被定义成支持事务处理的。
 
 在 Bean 配置文件中只需要启用 \<tx:annotation-driven> 元素， 并为之指定事务管理器就可以了。如果事务处理器的名称是 transactionManager， 就可以在\<tx:annotation-driven> 元素中省略 transaction-manager 属性。这个元素会自动检测该名称的事务处理器。
 
@@ -4268,3 +4274,298 @@ mysql> select stock from book_stock where isbn=1001;
 ```
 
 stock还是上次的2，没有变化，说明这个事务没有执行成功。
+
+### 2、事务传播属性
+
+当事务方法被另一个事务方法调用时，必须指定事务应该如何传播。例如：方法可能继续在现有事务中运行，也可能开启一个新事务，并在自己的事务中运行。事务的传播行为可以由传播属性指定。Spring 定义了 7 种类传播行为：
+
+<img src="./img/tx2.png" style="zoom:80%;" />
+
+为了方便演示，这里新定义 Cashier 接口表示客户的结账操作：
+
+```java
+public interface Cashier {
+
+	public void checkout(String username, List<String> isbns);
+	
+}
+```
+
+```java
+@Service("cashier")
+public class CashierImpl implements Cashier {
+
+	@Autowired
+	private BookShopService bookShopService;
+	
+	@Transactional
+	@Override
+	public void checkout(String username, List<String> isbns) {
+		for(String isbn: isbns){
+			bookShopService.purchase(username, isbn);
+		}
+	}
+}
+```
+
+修改数据表信息如下，目的是用户 Tom 在结账时，余额只能支付第一本书，不够支付第二本书：
+
+```sql
+mysql> select * from account;
++----------+---------+
+| username | balance |
++----------+---------+
+| AA       |     160 |
++----------+---------+
+1 row in set (0.00 sec)
+
+mysql> select * from book;
++------+-----------+-------+
+| isbn | book_name | price |
++------+-----------+-------+
+| 1001 | Java      |   100 |
+| 1002 | Oracle    |    70 |
++------+-----------+-------+
+2 rows in set (0.00 sec)
+
+mysql> select * from book_stock;
++------+-------+
+| isbn | stock |
++------+-------+
+| 1001 |     8 |
+| 1002 |     8 |
++------+-------+
+2 rows in set (0.00 sec)
+```
+
+修改测试代码：
+
+```java
+private Cashier cashier = null;
+```
+
+```java
+	{
+        ...
+		cashier = ctx.getBean(Cashier.class);
+	}
+```
+
+```java
+	@Test
+	public void testTransactionlPropagation()
+	{
+		cashier.checkout("AA", Arrays.asList("1001", "1002"));
+	}
+```
+
+测试结果如下：
+
+```
+com.jack.spring.tx.UserAccountException: 余额不足!
+
+	at com.jack.spring.tx.BookShopDaoImpl.updateUserAccount(BookShopDaoImpl.java:38)
+	at com.jack.spring.tx.BookShopServiceImpl.purchase(BookShopServiceImpl.java:46)
+```
+
+数据库没有任何改变。
+
+#### （1）REQUIRED 传播行为
+
+当 bookService 的 purchase() 方法被另一个事务方法 checkout() 调用时， **它默认会在现有的事务内运行，而不会开启新的事务**。 这个默认的传播行为就是 REQUIRED。 因此在 checkout() 方法的开始和终止边界内只有一个事务。 这个事务只在 checkout() 方法结束的时候被提交， 结果用户一本书都买不了：
+
+<img src="./img/tx3.png" style="zoom:80%;" />
+
+
+
+事务传播属性可以在 @Transactional 注解的 propagation 属性中定义。修改 BookShopServiceImpl 代码：
+
+```java
+	@Transactional(propagation = Propagation.REQUIRED)
+	@Override
+	public void purchase(String username, String isbn) {
+```
+
+效果和前面类似，**Transactional的默认传播行为就是REQUIRED**。
+
+#### （2）REQUIRES_NEW 传播行为
+
+另一种常见的传播行为是 REQUIRES_NEW， 它表示该方法必须启动一个新事务， 并在自己的事务内运行；如果有事务在运行， 就应该先挂起它：
+
+<img src="./img/tx4.png" style="zoom:80%;" />
+
+修改 BookShopServiceImpl 代码：
+
+```java
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	@Override
+	public void purchase(String username, String isbn) {
+```
+
+虽然也报同样的错：
+
+```
+com.jack.spring.tx.UserAccountException: 余额不足!
+```
+
+但数据库里的确是减少了1001书的数量和用户余额：
+
+```sql
+mysql> select * from account;
++----------+---------+
+| username | balance |
++----------+---------+
+| AA       |      60 |
++----------+---------+
+1 row in set (0.00 sec)
+
+mysql> select * from book_stock;
++------+-------+
+| isbn | stock |
++------+-------+
+| 1001 |     7 |
+| 1002 |     8 |
++------+-------+
+2 rows in set (0.00 sec)
+```
+
+#### （3）设置隔离事务属性
+
+当同一个应用程序或者不同应用程序中的多个事务在同一个数据集上并发执行时， 可能会出现许多意外的问题。
+
+并发事务所导致的问题可以分为下面三种类型：
+
+* **脏读：** 对于两个事物 T1， T2， T1  读取了已经被 T2 更新但 还没有被提交的字段， 之后， 若 T2 回滚， T1读取的内容就是临时且无效的。
+* **不可重复读：**对于两个事物 T1， T2， T1  读取了一个字段， 然后 T2 更新了该字段， 之后， T1再次读取同一个字段， 值就不同了。
+* **幻读：**对于两个事物 T1， T2， T1  从一个表中读取了一个字段， 然后 T2 在该表中插入了一些新的行， 之后， 如果 T1 再次读取同一个表， 就会多出几行。
+
+从理论上来说， 事务应该彼此完全隔离， 以避免并发事务所导致的问题。 然而， 那样会对性能产生极大的影响， 因为事务必须按顺序运行。 在实际开发中， 为了提升性能， 事务会以较低的隔离级别运行。
+
+事务的隔离级别可以通过隔离事务属性指定：
+
+<img src="./img/tx5.png" style="zoom:80%;" />
+
+事务的隔离级别要得到底层数据库引擎的支持， 而不是应用程序或者框架的支持。Oracle 支持的 2 种事务隔离级别：READ_COMMITED ， SERIALIZABLE。Mysql 支持 4 中事务隔离级别。
+
+Spring 可用 @Transactional 注解声明式地管理事务时可以在 @Transactional 的 isolation 属性中设置隔离级别：
+
+```java
+	@Transactional(propagation=Propagation.REQUIRES_NEW,
+			isolation=Isolation.READ_COMMITTED)
+```
+
+#### （4）设置回滚事务属性
+
+默认情况下只有未检查异常（RuntimeException和Error类型的异常）会导致事务回滚，而受检查异常不会。
+
+事务的回滚规则可以通过 @Transactional 注解的 rollbackFor 和 noRollbackFor 属性来定义。 这两个属性被声明为 Class[] 类型的， 因此可以为这两个属性指定多个异常类：
+
+* **rollbackFor**:  遇到时必须进行回滚
+* **noRollbackFor**: 一组异常类，遇到时必须不回滚
+
+当前数据库内容如下：
+
+```sql
+mysql> select * from account;
++----------+---------+
+| username | balance |
++----------+---------+
+| AA       |      60 |
++----------+---------+
+1 row in set (0.00 sec)
+
+mysql> select * from book_stock;
++------+-------+
+| isbn | stock |
++------+-------+
+| 1001 |     7 |
+| 1002 |     8 |
++------+-------+
+2 rows in set (0.00 sec)
+```
+
+修改 BookShopServiceImpl 代码：
+
+```sql
+	@Transactional(propagation=Propagation.REQUIRES_NEW,
+			isolation=Isolation.READ_COMMITTED,
+			noRollbackFor={UserAccountException.class})
+	@Override
+	public void purchase(String username, String isbn) {
+	...
+```
+
+从前面实验可以知道，当前用户AA的余额不足以完成该事务，正常情况下应该抛出异常并回滚，但通过上面设置后就不是了，测试 testBookShopService 方法，结果如下：
+
+```
+com.jack.spring.tx.UserAccountException: 余额不足!
+```
+
+数据库内容如下：
+
+```sql
+mysql> select * from account;
++----------+---------+
+| username | balance |
++----------+---------+
+| AA       |      60 |
++----------+---------+
+1 row in set (0.00 sec)
+
+mysql> select * from book_stock;
++------+-------+
+| isbn | stock |
++------+-------+
+| 1001 |     6 |
+| 1002 |     8 |
++------+-------+
+2 rows in set (0.00 sec)
+```
+
+isbn 为 1001的stock库存减一了，事务没有回滚，UserAccountException异常虽然抛出，但先前的减少操作仍然成功了。
+
+#### （5）超时和只读属性
+
+由于事务可以在行和表上获得锁，  因此长事务会占用资源， 并对整体性能产生影响。 如果一个事物只读取数据但不做修改， 数据库引擎可以对这个事务进行优化：
+
+* **超时事务属性:** 事务在强制回滚之前可以保持多久。 这样可以防止长期运行的事务占用资源。
+* **只读事务属性:** 表示这个事务只读取数据但不更新数据， 这样可以帮助数据库引擎优化事务。
+
+超时和只读属性可以在 @Transactional 注解中定义。超时属性以秒为单位来计算。
+
+修改 BookShopServiceImpl 代码：
+
+```java
+	@Transactional(propagation=Propagation.REQUIRES_NEW,
+			isolation=Isolation.READ_COMMITTED,
+			readOnly=false,
+			timeout=3)
+	@Override
+	public void purchase(String username, String isbn) {
+
+		try {
+			Thread.sleep(5000);
+		} catch (InterruptedException e) {}
+        ....
+```
+
+这里设置事务的超时时间为3s，为了方便测试，这里在purchase函数中延时5s，便于观察结果。
+
+执行 testBookShopService 测试方法，结果如下：
+
+```java
+org.springframework.transaction.TransactionTimedOutException: Transaction timed out: deadline was Thu Oct 08 21:06:31 CST 2020
+
+	at org.springframework.transaction.support.ResourceHolderSupport.checkTransactionTimeout(ResourceHolderSupport.java:155)
+	at org.springframework.transaction.support.ResourceHolderSupport.getTimeToLiveInMillis(ResourceHolderSupport.java:144)
+	at org.springframework.transaction.support.ResourceHolderSupport.getTimeToLiveInSeconds(ResourceHolderSupport.java:128)
+	at org.springframework.jdbc.datasource.DataSourceUtils.applyTimeout(DataSourceUtils.java:337)
+	at org.springframework.jdbc.core.JdbcTemplate.applyStatementSettings(JdbcTemplate.java:1372)
+	...
+```
+
+抛出了超时异常。
+
+### 3、基于XML方式配置事务
+
+见 配套代码 spring-3工程中的 src/com.jack.spring.xml 中内容。

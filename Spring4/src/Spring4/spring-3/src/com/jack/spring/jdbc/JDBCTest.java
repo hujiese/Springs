@@ -25,52 +25,52 @@ public class JDBCTest {
 	private JdbcTemplate jdbcTemplate;
 	private EmployeeDao employeeDao;
 	private DepartmentDao departmentDao;
-//	private NamedParameterJdbcTemplate namedParameterJdbcTemplate;
-//
+	private NamedParameterJdbcTemplate namedParameterJdbcTemplate;
+
 	{
 		ctx = new ClassPathXmlApplicationContext("applicationContext.xml");
 		jdbcTemplate = (JdbcTemplate) ctx.getBean("jdbcTemplate");
 		employeeDao = ctx.getBean(EmployeeDao.class);
 		departmentDao = ctx.getBean(DepartmentDao.class);
-//		namedParameterJdbcTemplate = ctx.getBean(NamedParameterJdbcTemplate.class);
+		namedParameterJdbcTemplate = ctx.getBean(NamedParameterJdbcTemplate.class);
 	}
-//
-//	/**
-//	 * 使用具名参数时, 可以使用 update(String sql, SqlParameterSource paramSource) 方法进行更新操作
-//	 * 1. SQL 语句中的参数名和类的属性一致!
-//	 * 2. 使用 SqlParameterSource 的 BeanPropertySqlParameterSource 实现类作为参数.
-//	 */
-//	@Test
-//	public void testNamedParameterJdbcTemplate2(){
-//		String sql = "INSERT INTO employees(last_name, email, dept_id) "
-//				+ "VALUES(:lastName,:email,:dpetId)";
-//
-//		Employee employee = new Employee();
-//		employee.setLastName("XYZ");
-//		employee.setEmail("xyz@sina.com");
-//		employee.setDpetId(3);
-//
-//		SqlParameterSource paramSource = new BeanPropertySqlParameterSource(employee);
-//		namedParameterJdbcTemplate.update(sql, paramSource);
-//	}
-//
-//	/**
-//	 * 可以为参数起名字.
-//	 * 1. 好处: 若有多个参数, 则不用再去对应位置, 直接对应参数名, 便于维护
-//	 * 2. 缺点: 较为麻烦.
-//	 */
-//	@Test
-//	public void testNamedParameterJdbcTemplate(){
-//		String sql = "INSERT INTO employees(last_name, email, dept_id) VALUES(:ln,:email,:deptid)";
-//
-//		Map<String, Object> paramMap = new HashMap<>();
-//		paramMap.put("ln", "FF");
-//		paramMap.put("email", "ff@atguigu.com");
-//		paramMap.put("deptid", 2);
-//
-//		namedParameterJdbcTemplate.update(sql, paramMap);
-//	}
-//
+
+	/**
+	 * 使用具名参数时, 可以使用 update(String sql, SqlParameterSource paramSource) 方法进行更新操作
+	 * 1. SQL 语句中的参数名和类的属性一致!
+	 * 2. 使用 SqlParameterSource 的 BeanPropertySqlParameterSource 实现类作为参数.
+	 */
+	@Test
+	public void testNamedParameterJdbcTemplate2(){
+		String sql = "INSERT INTO employees(last_name, email, dept_id) "
+				+ "VALUES(:lastName,:email,:dpetId)";
+
+		Employee employee = new Employee();
+		employee.setLastName("XYZ");
+		employee.setEmail("xyz@sina.com");
+		employee.setDpetId(3);
+
+		SqlParameterSource paramSource = new BeanPropertySqlParameterSource(employee);
+		namedParameterJdbcTemplate.update(sql, paramSource);
+	}
+
+	/**
+	 * 可以为参数起名字.
+	 * 1. 好处: 若有多个参数, 则不用再去对应位置, 直接对应参数名, 便于维护
+	 * 2. 缺点: 较为麻烦.
+	 */
+	@Test
+	public void testNamedParameterJdbcTemplate(){
+		String sql = "INSERT INTO employees(last_name, email, dept_id) VALUES(:ln,:email,:deptid)";
+
+		Map<String, Object> paramMap = new HashMap<>();
+		paramMap.put("ln", "FF");
+		paramMap.put("email", "ff@atguigu.com");
+		paramMap.put("deptid", 2);
+
+		namedParameterJdbcTemplate.update(sql, paramMap);
+	}
+
 	@Test
 	public void testDepartmentDao(){
 		System.out.println(departmentDao.get(1));
