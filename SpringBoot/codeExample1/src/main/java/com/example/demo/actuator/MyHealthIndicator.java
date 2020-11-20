@@ -1,7 +1,7 @@
 package com.example.demo.actuator;
 
+import org.springframework.boot.actuate.health.AbstractHealthIndicator;
 import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.stereotype.Component;
 
 /**
@@ -10,21 +10,35 @@ import org.springframework.stereotype.Component;
  * @date   2017/12/9
  */
 @Component
-public class MyHealthIndicator implements HealthIndicator {
+public class MyHealthIndicator extends AbstractHealthIndicator {
 
     @Override
-    public Health health() {
+    protected void doHealthCheck(Health.Builder builder) throws Exception {
         Long totalSpace = checkTocalSpace();
         Long free = checkFree();
         String status = checkStatus();
-        checkFree();
-        return new Health.Builder()
-                .up()
+        builder.up()
                 .withDetail("status",status)
                 .withDetail("total",totalSpace)
                 .withDetail("free",free)
                 .build();
+//        builder.up().withDetail("status", true);
+        //builder.down().withDetail("status", false);
     }
+
+//    @Override
+//    public Health health() {
+//        Long totalSpace = checkTocalSpace();
+//        Long free = checkFree();
+//        String status = checkStatus();
+//        checkFree();
+//        return new Health.Builder()
+//                .up()
+//                .withDetail("status",status)
+//                .withDetail("total",totalSpace)
+//                .withDetail("free",free)
+//                .build();
+//    }
     private String checkStatus(){
         //结合真实项目，获取相关参数
         return "UP";
