@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jack.mybatis.dao.EmployeeMapper">
+<!-- 
+namespace:名称空间;指定为接口的全类名
+id：唯一标识
+resultType：返回值类型
+#{id}：从传递过来的参数中取出id值
+
+public Employee getEmpById(Integer id);
+ -->
+
+	<!--public Map<Integer, Employee> getEmpByLastNameLikeReturnMap(String lastName);  -->
+	<select id="getEmpByLastNameLikeReturnMap" resultType="com.jack.mybatis.bean.Employee">
+ 		select * from tb1_employee where last_name like #{lastName}
+ 	</select>
+
+	<!--public Map<String, Object> getEmpByIdReturnMap(Integer id);  -->
+	<select id="getEmpByIdReturnMap" resultType="map">
+ 		select * from tb1_employee where id=#{id}
+ 	</select>
+
+	<!-- public List<Employee> getEmpsByLastNameLike(String lastName); -->
+	<!--resultType：如果返回的是一个集合，要写集合中元素的类型  -->
+	<select id="getEmpsByLastNameLike" resultType="com.jack.mybatis.bean.Employee">
+		select * from tb1_employee where last_name like #{lastName}
+	</select>
+
+	<!-- public Employee getEmpByMap(Map<String, Object> map); -->
+	<select id="getEmpByMap" resultType="com.jack.mybatis.bean.Employee">
+ 		select * from ${tableName} where id=${id} and last_name=#{lastName}
+ 	</select>
+
+	<!--  public Employee getEmpByIdAndLastName(Integer id,String lastName);-->
+	<select id="getEmpByIdAndLastName" resultType="com.jack.mybatis.bean.Employee">
+ 		select * from tb1_employee where id = #{id} and last_name=#{lastName}
+ 	</select>
+
+	<select id="selectEmp" resultType="com.jack.mybatis.bean.Employee">
+		select id,last_name lastName,email,gender from tb1_employee where id = #{id}
+	</select>
+
+	<select id="getEmpById" resultType="emp" databaseId="mysql">
+		select * from tb1_employee where id = #{id}
+	</select>
+
+	<!-- public void addEmp(Employee employee); -->
+	<!-- parameterType：参数类型，可以省略，
+	获取自增主键的值：
+		mysql支持自增主键，自增主键值的获取，mybatis也是利用statement.getGenreatedKeys()；
+		useGeneratedKeys="true"；使用自增主键获取主键值策略
+		keyProperty；指定对应的主键属性，也就是mybatis获取到主键值以后，将这个值封装给javaBean的哪个属性
+	-->
+	<insert id="addEmp" parameterType="com.jack.mybatis.bean.Employee"
+			useGeneratedKeys="true" keyProperty="id" databaseId="mysql">
+		insert into tb1_employee(last_name,email,gender)
+		values(#{lastName},#{email},#{gender})
+	</insert>
+
+	<!-- public void updateEmp(Employee employee);  -->
+	<update id="updateEmp">
+		update tb1_employee
+		set last_name=#{lastName},email=#{email},gender=#{gender}
+		where id=#{id}
+	</update>
+
+	<!-- public void deleteEmpById(Integer id); -->
+	<delete id="deleteEmpById">
+		delete from tb1_employee where id=#{id}
+	</delete>
+</mapper>
